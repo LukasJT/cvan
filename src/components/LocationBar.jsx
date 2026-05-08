@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { BORTLE } from "../astro.js";
-import { THEMES } from "../theme.js";
 
 export function LocationBar({
   coords, locating, locError,
@@ -9,7 +8,6 @@ export function LocationBar({
   retryGeolocation,
   bortleAuto, viirsState,
   mapOpen, setMapOpen,
-  theme, setTheme,
 }) {
   return (
     <div className="panel corner p-5">
@@ -47,7 +45,6 @@ export function LocationBar({
           <div className="flex flex-col gap-1">
             <button className="ghost" onClick={retryGeolocation} title="Use my GPS">GPS</button>
             <button className="ghost" onClick={() => setMapOpen(!mapOpen)} title="Pick on map" style={mapOpen ? { color: "var(--bg-base)", background: "var(--accent-gold)" } : undefined}>MAP</button>
-            <ThemeButton theme={theme} setTheme={setTheme} />
           </div>
         </div>
       </div>
@@ -96,19 +93,6 @@ function BortleDisplay({ bortleAuto }) {
       </div>
       <div className="body text-sm mt-2 primary">{info.mw}</div>
     </div>
-  );
-}
-
-function ThemeButton({ theme, setTheme }) {
-  const next = () => {
-    const i = THEMES.indexOf(theme);
-    setTheme(THEMES[(i + 1) % THEMES.length]);
-  };
-  const label = theme === "dark" ? "DARK" : theme === "light" ? "LIGHT" : "RED";
-  return (
-    <button className="ghost" onClick={next} title="Cycle theme (dark / light / red night-vision)">
-      {label}
-    </button>
   );
 }
 

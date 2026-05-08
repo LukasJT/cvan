@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { THEMES } from "../theme.js";
 
 export function DataCell({ label, value, sub }) {
   return (
@@ -98,6 +99,144 @@ export function OutOfRangeNotice({ what, horizon }) {
         {what} is unavailable beyond {horizon}. Astronomical factors (sun, moon, Milky Way core position, twilight) are still computed; weather is excluded from the score.
       </div>
     </div>
+  );
+}
+
+/* Settings cog (top-left). Click toggles a popover with theme picker.
+   Designed to grow as more app-level settings get added later. */
+export function SettingsCog({ theme, setTheme }) {
+  const [open, setOpen] = useState(false);
+  const popoverRef = useRef(null);
+  const buttonRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e) => {
+      if (popoverRef.current?.contains(e.target)) return;
+      if (buttonRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div style={{ position: "relative", display: "inline-block" }}>
+      <button
+        ref={buttonRef}
+        onClick={() => setOpen((v) => !v)}
+        title="Settings"
+        aria-label="Settings"
+        aria-expanded={open}
+        style={{
+          background: "transparent",
+          border: "1px solid var(--frame-border)",
+          color: "var(--accent-gold)",
+          width: 36,
+          height: 36,
+          padding: 0,
+          borderRadius: 2,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+        }}
+      >
+        <CogIcon spinning={open} />
+      </button>
+      {open && (
+        <div
+          ref={popoverRef}
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            left: 0,
+            zIndex: 100,
+            minWidth: 220,
+            background: "linear-gradient(180deg, var(--panel-bg-from) 0%, var(--panel-bg-to) 100%)",
+            border: "1px solid var(--frame-border)",
+            borderRadius: 4,
+            padding: "0.75rem",
+            backdropFilter: "blur(6px)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+          }}
+        >
+          <div className="mono text-xs uppercase tracking-widest mb-2 muted">Theme</div>
+          <div className="flex flex-col gap-1">
+            {THEMES.map((t) => (
+              <ThemeOption
+                key={t}
+                value={t}
+                current={theme}
+                onPick={(v) => { setTheme(v); setOpen(false); }}
+              />
+            ))}
+          </div>
+          <div className="mt-2 mono text-xs subtle" style={{ borderTop: "1px solid var(--panel-border)", paddingTop: "0.5rem" }}>
+            Red mode preserves dark adaptation for nighttime field use.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ThemeOption({ value, current, onPick }) {
+  const labels = {
+    dark: { name: "Dark", desc: "Default night-sky theme" },
+    light: { name: "Light", desc: "Daytime / planning use" },
+    red: { name: "Red night-vision", desc: "Astronomy red light" },
+  };
+  const swatchFill = {
+    dark: "linear-gradient(135deg, #0d1b3d, #02040a)",
+    light: "linear-gradient(135deg, #f5f1e6, #cec0a0)",
+    red: "linear-gradient(135deg, #260000, #0a0000)",
+  };
+  const swatchAccent = { dark: "#d4b86a", light: "#7a5f1f", red: "#ff4040" };
+  const active = value === current;
+  return (
+    <button
+      onClick={() => onPick(value)}
+      className="ghost"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "0.6rem",
+        padding: "0.4rem 0.5rem",
+        background: active ? "var(--strip-bg)" : "transparent",
+        borderColor: active ? "var(--accent-gold)" : "var(--frame-border)",
+        textAlign: "left",
+        width: "100%",
+        cursor: "pointer",
+      }}
+    >
+      <span style={{
+        width: 24, height: 24, borderRadius: 2,
+        background: swatchFill[value],
+        border: `1px solid ${swatchAccent[value]}`,
+        display: "inline-block",
+        flexShrink: 0,
+      }} />
+      <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
+        <span className="display gold" style={{ fontSize: "0.8rem" }}>{labels[value].name}</span>
+        <span className="mono muted" style={{ fontSize: "0.65rem", letterSpacing: "0.05em" }}>{labels[value].desc}</span>
+      </span>
+      {active && <span className="mono gold" style={{ marginLeft: "auto", fontSize: "0.7rem" }}>✓</span>}
+    </button>
+  );
+}
+
+function CogIcon({ spinning }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "transform 0.3s ease", transform: spinning ? "rotate(60deg)" : "none" }}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
   );
 }
 

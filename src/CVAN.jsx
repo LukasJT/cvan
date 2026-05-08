@@ -6,7 +6,7 @@ import {
   altitudeCurve, compositeScore, findEvents, RAD,
 } from "./astro.js";
 import { applyTheme, loadTheme } from "./theme.js";
-import { Insignia } from "./components/shared.jsx";
+import { Insignia, SettingsCog } from "./components/shared.jsx";
 import { LocationBar } from "./components/LocationBar.jsx";
 import { MapPanel } from "./components/MapPicker.jsx";
 import { Overview } from "./components/Overview.jsx";
@@ -272,6 +272,7 @@ export default function CVAN() {
           <div className="flex items-start justify-between gap-6 flex-wrap">
             <div>
               <div className="flex items-center gap-3 mb-2">
+                <SettingsCog theme={theme} setTheme={setTheme} />
                 <Insignia />
                 <div>
                   <h1 className="display text-3xl gold leading-none">CVAN</h1>
@@ -302,7 +303,6 @@ export default function CVAN() {
           bortleAuto={bortleAuto}
           viirsState={viirsState}
           mapOpen={mapOpen} setMapOpen={setMapOpen}
-          theme={theme} setTheme={setTheme}
         />
 
         {mapOpen && coords && (
