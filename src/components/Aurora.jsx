@@ -64,7 +64,7 @@ export function Aurora({ aurora, weather, bortle, sky, coords, kpForecast, weath
           <FactorRow label="Moon" status={sky.moonBrightness < 0.5 ? "good" : sky.moonBrightness < 2 ? "fair" : "bad"}
             note={`${moonPhaseName(sky.phase.phaseFraction)}, sky brightening +${sky.moonBrightness.toFixed(2)} mag. Bright aurora overpowers moonlight; faint diffuse aurora gets washed out.`} />
           <FactorRow label="City light pollution" status={bortle == null ? "unknown" : bortle <= 4 ? "good" : bortle <= 6 ? "fair" : "bad"}
-            note={bortle != null ? `Bortle ${bortle}. Strong aurora visible from cities; subtle green glow needs Bortle ≤ 4. Look toward magnetic north — get away from streetlights.` : "VIIRS data unavailable for this location."} />
+            note={bortle != null ? `Bortle ${bortle}. Strong aurora visible from cities; subtle green glow needs Bortle ≤ 4. Look toward magnetic north — get away from streetlights.` : "Light-pollution atlas tile unavailable for this location."} />
           <FactorRow label="Twilight" status={sky.tw.code === "night" ? "good" : sky.tw.code === "astro" || sky.tw.code === "nautical" ? "fair" : "bad"}
             note={`${sky.tw.name}. Aurora visible during nautical twilight if strong, but full darkness gives best contrast.`} />
         </div>

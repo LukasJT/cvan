@@ -6,7 +6,7 @@
    - Krisciunas & Schaefer 1991 (PASP 103, 1033) — moon sky brightness
    - IGRF-13 dipole approximation for geomagnetic coords
    - NOAA SWPC Kp/auroral oval model (KP_VIEW_LAT)
-   - Falchi et al. 2016 + Cinzano et al. 2001 — VIIRS → SQM → Bortle
+   - Bortle 2001 — Bortle dark-sky scale class definitions (BORTLE table)
    ========================================================================= */
 export const DEG = Math.PI / 180;
 export const RAD = 180 / Math.PI;
@@ -150,20 +150,6 @@ export function moonSkyBrightness(moonAltDeg, phaseAngleDeg) {
   const phaseFactor = Math.pow(10, -0.4 * (0.026 * Math.abs(phaseAngleDeg) + 4e-9 * Math.pow(phaseAngleDeg, 4)));
   const altFactor = Math.sin(Math.max(0, moonAltDeg) * DEG);
   return 3.0 * phaseFactor * altFactor;
-}
-
-/* Falchi/Cinzano-style empirical chain. R is VIIRS upward radiance nW/cm²/sr. */
-export function viirsRadianceToBortle(radiance) {
-  const r = Math.max(0, radiance);
-  const artificial = 0.263 * Math.pow(r, 1.092);
-  const total = artificial + 0.171168465;
-  const sqm = Math.log10(total / 1.08e8) / -0.4;
-  let bortle = 9;
-  for (const b of BORTLE) {
-    if (sqm >= b.sqmMin && sqm < b.sqmMax) { bortle = b.c; break; }
-    if (sqm >= b.sqmMax && b.c === 1) { bortle = 1; break; }
-  }
-  return { bortle, sqm, radiance: r, artificial };
 }
 
 export const BORTLE = [

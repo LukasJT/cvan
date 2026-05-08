@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   toJulian, julianCentury, gmst, lst, sunPosition, moonPosition,
   equatorialToHorizontal, moonPhase, twilightClass, moonSkyBrightness,
-  viirsRadianceToBortle, KP_VIEW_LAT, GALACTIC_CORE, fmtTime,
+  KP_VIEW_LAT, GALACTIC_CORE, fmtTime,
   altitudeCurve, compositeScore, findEvents, RAD,
 } from "./astro.js";
+import { fetchLightPollutionAt } from "./lightPollution.js";
 import { applyTheme, loadTheme } from "./theme.js";
 import { Insignia, SettingsCog } from "./components/shared.jsx";
 import { LocationBar } from "./components/LocationBar.jsx";
@@ -170,27 +171,9 @@ export default function CVAN() {
 
   const fetchViirs = (lat, lon) => {
     setViirsState("loading");
-    const px = 0.0042;
-    const env = {
-      xmin: lon - px, ymin: lat - px,
-      xmax: lon + px, ymax: lat + px,
-      spatialReference: { wkid: 4326 },
-    };
-    const url =
-      `https://gis.ngdc.noaa.gov/arcgis/rest/services/NPP_VIIRS_DNB/Nightly_Radiance/ImageServer/getSamples?` +
-      `geometry=${encodeURIComponent(JSON.stringify(env))}` +
-      `&geometryType=esriGeometryEnvelope&sampleCount=9&returnFirstValueOnly=false&f=json`;
-    fetch(url)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data.samples || !data.samples.length) { setViirsState("error"); return; }
-        const vals = data.samples
-          .map((s) => parseFloat(s.value))
-          .filter((v) => Number.isFinite(v) && v >= 0)
-          .sort((a, b) => a - b);
-        if (!vals.length) { setViirsState("error"); return; }
-        const median = vals[Math.floor(vals.length / 2)];
-        setBortleAuto(viirsRadianceToBortle(median));
+    fetchLightPollutionAt(lat, lon)
+      .then((res) => {
+        setBortleAuto(res);
         setViirsState("ok");
         setLastUpdated((u) => ({ ...u, viirs: new Date() }));
       })
@@ -479,7 +462,7 @@ export default function CVAN() {
 
         <footer className="mt-16 pt-6 text-center mono text-xs" style={{ color: "var(--text-subtle)", borderTop: "1px solid var(--panel-border)" }}>
           <div>POSITIONS · MEEUS ASTRONOMICAL ALGORITHMS · WEATHER · OPEN-METEO · AURORA · NOAA SWPC</div>
-          <div className="mt-1">LIGHT POLLUTION · NOAA NCEI VIIRS DNB · MOON SKY BRIGHTNESS · KRISCIUNAS-SCHAEFER (1991) · BORTLE SCALE · BORTLE (2001) · GEOMAG · IGRF-13 DIPOLE</div>
+          <div className="mt-1">LIGHT POLLUTION · LORENZ VIIRS ATLAS · MOON SKY BRIGHTNESS · KRISCIUNAS-SCHAEFER (1991) · BORTLE SCALE · BORTLE (2001) · GEOMAG · IGRF-13 DIPOLE</div>
           <div className="mt-2">
             <button className="ghost" onClick={() => setTab("sources")} style={{ padding: "0.25rem 0.6rem", fontSize: "0.65rem" }}>FULL CITATIONS →</button>
           </div>
@@ -515,7 +498,7 @@ function DataStatusStrip({ lastUpdated, now, onRefresh }) {
         {cell("WEATHER", lastUpdated.weather, "24h", "var(--accent-green)")}
         {cell("Kp NOW", lastUpdated.aurora, "5m", "var(--accent-purple)")}
         {cell("Kp 3-DAY", lastUpdated.kpForecast, "30m", "var(--accent-blue)")}
-        {cell("VIIRS BORTLE", lastUpdated.viirs, "24h", "var(--accent-warm)")}
+        {cell("LP ATLAS", lastUpdated.viirs, "24h", "var(--accent-warm)")}
       </div>
       <button className="ghost" style={{ padding: "0.3rem 0.7rem", fontSize: "0.65rem" }} onClick={onRefresh}>
         ⟳ REFRESH NOW

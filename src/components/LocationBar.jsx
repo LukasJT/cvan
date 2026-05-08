@@ -55,23 +55,23 @@ export function LocationBar({
             Light Pollution · Bortle Class
           </div>
           {viirsState === "loading" && (
-            <span className="pill mono" style={{ background: "var(--text-muted)", color: "var(--bg-base)" }}>FETCHING NOAA VIIRS…</span>
+            <span className="pill mono" style={{ background: "var(--text-muted)", color: "var(--bg-base)" }}>FETCHING ATLAS…</span>
           )}
           {viirsState === "error" && (
-            <span className="pill mono" style={{ background: "var(--error)", color: "var(--bg-base)" }}>VIIRS UNAVAILABLE</span>
+            <span className="pill mono" style={{ background: "var(--error)", color: "var(--bg-base)" }}>ATLAS UNAVAILABLE</span>
           )}
           {viirsState === "ok" && (
-            <span className="pill mono" style={{ background: "var(--accent-green)", color: "var(--bg-base)" }}>AUTO · NOAA VIIRS</span>
+            <span className="pill mono" style={{ background: "var(--accent-green)", color: "var(--bg-base)" }}>AUTO · VIIRS ATLAS</span>
           )}
         </div>
         {bortleAuto ? (
           <BortleDisplay bortleAuto={bortleAuto} />
         ) : viirsState === "error" ? (
           <div className="body text-sm secondary">
-            Could not retrieve VIIRS radiance for this location. The NOAA NCEI service may be temporarily unavailable, or this location is outside the VIIRS rolling-window coverage. Light pollution will be excluded from the score.
+            Could not retrieve the light-pollution atlas tile for this location. Light pollution will be excluded from the score.
           </div>
         ) : (
-          <div className="body text-sm muted italic">Awaiting VIIRS data…</div>
+          <div className="body text-sm muted italic">Awaiting atlas data…</div>
         )}
       </div>
     </div>
@@ -88,8 +88,9 @@ function BortleDisplay({ bortleAuto }) {
       </div>
       <div className="mono text-xs mt-1 secondary">
         SQM <span className="gold">{bortleAuto.sqm.toFixed(2)}</span> mag/arcsec²
-        · VIIRS radiance <span className="gold">{bortleAuto.radiance.toFixed(2)}</span> nW/cm²/sr
-        · artificial <span className="gold">{bortleAuto.artificial.toFixed(2)}</span> mcd/m²
+        · LPI <span className="gold">{bortleAuto.lpi.toFixed(2)}</span>×
+        · zone <span className="gold">{bortleAuto.zone}</span>
+        {bortleAuto.year ? <> · atlas <span className="gold">{bortleAuto.year}</span></> : null}
       </div>
       <div className="body text-sm mt-2 primary">{info.mw}</div>
     </div>

@@ -20,7 +20,7 @@ export function Sources() {
 
       <div className="panel corner p-6">
         <h2 className="display gold text-lg mb-3">Light Pollution &amp; Sky Brightness</h2>
-        <SourceList ids={["bortle", "falchi2016", "cinzano2001", "viirsdnb", "ncei-viirs", "ks1991"]} />
+        <SourceList ids={["bortle", "lorenz-lp-atlas", "falchi2016", "viirsdnb", "ks1991"]} />
       </div>
 
       <div className="panel corner p-6">

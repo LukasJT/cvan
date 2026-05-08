@@ -47,7 +47,7 @@ export function MilkyWay({ sky, weather, bortle, bortleAuto, curve, coords, weat
             <div className="mono text-xs uppercase tracking-widest muted">Bortle Scale · What You'll See at Class {bortle}</div>
             {bortleAuto && (
               <div className="mono text-xs secondary">
-                MEASURED · SQM <span className="gold">{bortleAuto.sqm.toFixed(2)}</span> · VIIRS <span className="gold">{bortleAuto.radiance.toFixed(2)}</span> nW/cm²/sr · ARTIFICIAL <span className="gold">{bortleAuto.artificial.toFixed(2)}</span> mcd/m²
+                MEASURED · SQM <span className="gold">{bortleAuto.sqm.toFixed(2)}</span> · LPI <span className="gold">{bortleAuto.lpi.toFixed(2)}</span>× NATURAL · ZONE <span className="gold">{bortleAuto.zone}</span>
               </div>
             )}
           </div>
@@ -73,7 +73,7 @@ export function MilkyWay({ sky, weather, bortle, bortleAuto, curve, coords, weat
           {bortleInfo ? (
             <FactorRow label="Light pollution (Bortle)" status={bortle <= 3 ? "good" : bortle <= 5 ? "fair" : "bad"} note={`Class ${bortle} — ${bortleInfo.name}. ${bortleInfo.mw}`} />
           ) : (
-            <FactorRow label="Light pollution (Bortle)" status="unknown" note="VIIRS data unavailable for this location — light pollution excluded from analysis." />
+            <FactorRow label="Light pollution (Bortle)" status="unknown" note="Light-pollution atlas tile unavailable for this location — light pollution excluded from analysis." />
           )}
           <FactorRow label="Moon" status={sky.moonBrightness < 0.3 ? "good" : sky.moonBrightness < 1.5 ? "fair" : "bad"}
             note={`${moonPhaseName(sky.phase.phaseFraction)} (${(sky.phase.illumination * 100).toFixed(0)}% illuminated), altitude ${fmtDeg(sky.moonHz.alt)}. Sky brightening +${sky.moonBrightness.toFixed(2)} mag (Krisciunas-Schaefer model). Moon must be below horizon — and below roughly −5° to make moonlight negligible (Δ-V < 0.1 mag).`} />
