@@ -19,6 +19,15 @@ import { KpForecast } from "./components/KpForecast.jsx";
 import { Sources } from "./components/Sources.jsx";
 
 const WEATHER_HORIZON_DAYS = 16;
+const LOCATION_CACHE_KEY = "cvan-last-location";
+
+function persist(coords) {
+  try {
+    localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({
+      lat: coords.lat, lon: coords.lon, label: coords.label,
+    }));
+  } catch {/* ignore — private browsing etc. */}
+}
 
 export default function CVAN() {
   const [tab, setTab] = useState("overview");
@@ -40,30 +49,74 @@ export default function CVAN() {
   // Apply theme on change
   useEffect(() => { applyTheme(theme); }, [theme]);
 
+  // Persist any coord change to localStorage so the next visit warm-starts.
+  useEffect(() => { if (coords) persist(coords); }, [coords]);
+
   // Tick clock every minute
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(id);
   }, []);
 
-  // Geolocation on mount
+  /* Auto-locate on mount.
+     Strategy: warm-start from localStorage cache, then ask the browser GPS,
+     and fall back to IP geolocation if GPS is denied or unavailable. */
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setLocError("Geolocation not available");
-      return;
-    }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude, label: "Current location" });
-        setLocating(false);
-      },
-      () => {
-        setLocError("Location access denied — search a city or enter coordinates");
-        setLocating(false);
-      },
-      { timeout: 8000 }
-    );
+    let cancelled = false;
+
+    // 1) Warm start: load last known location instantly so the UI isn't blank.
+    try {
+      const cached = JSON.parse(localStorage.getItem("cvan-last-location") || "null");
+      if (cached && Number.isFinite(cached.lat) && Number.isFinite(cached.lon)) {
+        setCoords({ ...cached, label: cached.label || "Last known location" });
+      }
+    } catch {/* ignore */}
+
+    // 2) Try precise GPS.
+    const tryGps = () => new Promise((resolve, reject) => {
+      if (!navigator.geolocation) { reject(new Error("no-geolocation-api")); return; }
+      setLocating(true);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude, label: "Current location", source: "gps" }),
+        (err) => reject(err),
+        { timeout: 8000, maximumAge: 5 * 60 * 1000 }
+      );
+    });
+
+    // 3) IP fallback (~city-level accuracy, no permission prompt).
+    const tryIp = async () => {
+      const r = await fetch("https://ipapi.co/json/");
+      if (!r.ok) throw new Error("ip-lookup-failed");
+      const j = await r.json();
+      if (!Number.isFinite(j.latitude) || !Number.isFinite(j.longitude)) throw new Error("ip-no-coords");
+      const label = [j.city, j.region, j.country_name].filter(Boolean).join(", ") || "Approx location";
+      return { lat: j.latitude, lon: j.longitude, label: `${label} (IP)`, source: "ip" };
+    };
+
+    (async () => {
+      try {
+        const fix = await tryGps();
+        if (cancelled) return;
+        setCoords(fix);
+        setLocError(null);
+        persist(fix);
+      } catch {
+        try {
+          const fix = await tryIp();
+          if (cancelled) return;
+          setCoords(fix);
+          setLocError("Using approximate location from IP — grant GPS or enter coords for precision.");
+          persist(fix);
+        } catch {
+          if (cancelled) return;
+          setLocError("Couldn't auto-locate — search a city or enter coordinates.");
+        }
+      } finally {
+        if (!cancelled) setLocating(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, []);
 
   /* ---------- DATA FETCHERS ---------- */
