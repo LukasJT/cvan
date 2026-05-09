@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  toJulian, julianCentury, gmst, lst, sunPosition, moonPosition,
-  equatorialToHorizontal, moonPhase, twilightClass, moonSkyBrightness,
-  KP_VIEW_LAT, GALACTIC_CORE, fmtTime,
-  altitudeCurve, compositeScore, findEvents, RAD,
+  sunPosition, moonPosition, computeSky, fmtTime,
+  altitudeCurve, compositeScore, findEvents,
 } from "./astro.js";
 import { fetchLightPollutionAt } from "./lightPollution.js";
 import { applyTheme, loadTheme } from "./theme.js";
@@ -216,21 +214,7 @@ export default function CVAN() {
   }, [coords]);
 
   /* ---------- DERIVED ASTRONOMY ---------- */
-  const sky = useMemo(() => {
-    if (!coords) return null;
-    const jd = toJulian(now);
-    const sun = sunPosition(jd);
-    const moon = moonPosition(jd);
-    const sidereal = lst(jd, coords.lon);
-    const sunHz = equatorialToHorizontal(sun.ra, sun.dec, sidereal, coords.lat);
-    const moonHz = equatorialToHorizontal(moon.ra, moon.dec, sidereal, coords.lat);
-    const coreHz = equatorialToHorizontal(GALACTIC_CORE.ra, GALACTIC_CORE.dec, sidereal, coords.lat);
-    const phase = moonPhase(jd);
-    const phaseAngle = Math.acos(2 * phase.illumination - 1) * RAD;
-    const moonBrightness = moonSkyBrightness(moonHz.alt, phaseAngle);
-    const tw = twilightClass(sunHz.alt);
-    return { jd, sun, moon, sunHz, moonHz, coreHz, phase, phaseAngle, moonBrightness, tw };
-  }, [coords, now]);
+  const sky = useMemo(() => coords ? computeSky(now, coords) : null, [coords, now]);
 
   /* Rise/set events anchored to today's date — recomputes once per day, not per minute. */
   const dayKey = now.toDateString();
@@ -424,6 +408,7 @@ export default function CVAN() {
                 bortleAuto={bortleAuto}
                 curve={tonightCurve}
                 coords={coords}
+                now={now}
                 weatherStale={!weather}
               />
             )}
@@ -435,6 +420,7 @@ export default function CVAN() {
                 sky={skyWithEvents}
                 coords={coords}
                 kpForecast={kpForecast}
+                now={now}
                 weatherStale={!weather}
               />
             )}

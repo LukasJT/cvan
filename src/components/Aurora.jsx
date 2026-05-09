@@ -1,9 +1,14 @@
 import React, { useMemo, useState } from "react";
-import { fmtDeg, fmtTime, KP_VIEW_LAT, geomagneticLatitude, DEG, moonPhaseName, parseLocationTime } from "../astro.js";
-import { DataCell, FactorRow, OutOfRangeNotice } from "./shared.jsx";
+import {
+  fmtDeg, fmtTime, KP_VIEW_LAT, geomagneticLatitude, DEG, moonPhaseName,
+  computeSky, cloudCoverAt, kpAt,
+} from "../astro.js";
+import { DataCell, FactorRow, OutOfRangeNotice, TimeOffsetSlider } from "./shared.jsx";
 import { auroraVerdict, cloudVerdict } from "../verdicts.js";
 
-export function Aurora({ aurora, weather, bortle, sky, coords, kpForecast, weatherStale }) {
+const MAX_HOURS = 72; // three days
+
+export function Aurora({ aurora, weather, bortle, sky, coords, kpForecast, now, weatherStale }) {
   if (!aurora) {
     return (
       <div className="panel corner p-6 text-center">
@@ -13,10 +18,42 @@ export function Aurora({ aurora, weather, bortle, sky, coords, kpForecast, weath
     );
   }
 
-  const kp = aurora.kp;
+  const [offsetHours, setOffsetHours] = useState(0);
+  const tzName = weather?.timezone ?? null;
+
+  const previewTime = useMemo(
+    () => new Date((now ?? new Date()).getTime() + offsetHours * 3600000),
+    [now, offsetHours]
+  );
+
+  // Kp at the previewed time — falls through to current if outside forecast.
+  const previewKpBucket = useMemo(() => {
+    if (offsetHours === 0) return null;
+    return kpAt(kpForecast, previewTime.getTime());
+  }, [kpForecast, previewTime, offsetHours]);
+  const kp = previewKpBucket ? previewKpBucket.kp : aurora.kp;
+  const kpSource = offsetHours === 0
+    ? "current observed"
+    : previewKpBucket
+      ? (previewKpBucket.observed === "predicted" ? "predicted" : "observed")
+      : "current observed (forecast OOR)";
+
   const threshold = KP_VIEW_LAT[Math.floor(kp)] ?? 50;
   const geomagLat = geomagneticLatitude(coords.lat, coords.lon);
   const absGeoLat = Math.abs(geomagLat);
+
+  // Sky + cloud at preview time for the conditions panel.
+  const previewSky = useMemo(
+    () => offsetHours === 0 ? sky : computeSky(previewTime, coords),
+    [sky, previewTime, coords, offsetHours]
+  );
+  const previewCloud = useMemo(() => {
+    if (offsetHours === 0) return weatherStale ? null : weather?.current?.cloud_cover ?? null;
+    return cloudCoverAt(weather, previewTime.getTime());
+  }, [offsetHours, previewTime, weather, weatherStale]);
+  const previewCloudOutOfRange = offsetHours > 0 && previewCloud == null;
+
+  // Headline verdict stays anchored to current Kp/cloud.
   const cloud = weatherStale ? null : weather?.current?.cloud_cover ?? null;
   const verdict = auroraVerdict(aurora, coords.lat, cloud, geomagLat);
 
@@ -25,7 +62,7 @@ export function Aurora({ aurora, weather, bortle, sky, coords, kpForecast, weath
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="panel corner p-6">
           <div className="mono text-xs uppercase tracking-widest mb-3 muted">NOAA Planetary Kp</div>
-          <KpDial kp={kp} />
+          <KpDial kp={aurora.kp} />
           <div className="mono text-xs text-center mt-2 muted">
             updated {new Date(aurora.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
           </div>
@@ -33,15 +70,15 @@ export function Aurora({ aurora, weather, bortle, sky, coords, kpForecast, weath
 
         <div className="panel corner p-6 lg:col-span-2">
           <div className="mono text-xs uppercase tracking-widest mb-3 muted">Viewing Geometry · Geomagnetic Coordinates</div>
-          <ViewingLatDiagram kp={kp} userGeoLat={absGeoLat} threshold={threshold} />
+          <ViewingLatDiagram kp={aurora.kp} userGeoLat={absGeoLat} threshold={KP_VIEW_LAT[Math.floor(aurora.kp)] ?? 50} />
           <div className="grid grid-cols-3 gap-3 mt-4">
             <DataCell label="Geographic |Lat|" value={fmtDeg(Math.abs(coords.lat), 1)} />
             <DataCell label="Geomagnetic |Lat|" value={fmtDeg(absGeoLat, 1)} sub="dipole approx" />
-            <DataCell label="Threshold @ Kp" value={fmtDeg(threshold)} sub="geomag lat" />
+            <DataCell label="Threshold @ Kp" value={fmtDeg(KP_VIEW_LAT[Math.floor(aurora.kp)] ?? 50)} sub="geomag lat" />
           </div>
           <div className="mt-3 mono text-xs secondary">
-            Margin: <span className="gold">{(absGeoLat - threshold > 0 ? "+" : "")}{(absGeoLat - threshold).toFixed(1)}°</span>
-            {" "}{absGeoLat > threshold ? "above viewing threshold" : "below threshold (need higher Kp)"}
+            Margin: <span className="gold">{(absGeoLat - (KP_VIEW_LAT[Math.floor(aurora.kp)] ?? 50) > 0 ? "+" : "")}{(absGeoLat - (KP_VIEW_LAT[Math.floor(aurora.kp)] ?? 50)).toFixed(1)}°</span>
+            {" "}{absGeoLat > (KP_VIEW_LAT[Math.floor(aurora.kp)] ?? 50) ? "above viewing threshold" : "below threshold (need higher Kp)"}
           </div>
         </div>
       </div>
@@ -53,26 +90,50 @@ export function Aurora({ aurora, weather, bortle, sky, coords, kpForecast, weath
       </div>
 
       <div className="panel corner p-6">
-        <div className="mono text-xs uppercase tracking-widest mb-3 muted">Conditions Affecting Aurora Viewing</div>
+        <div className="mono text-xs uppercase tracking-widest mb-3 muted">
+          Conditions Affecting {offsetHours === 0 ? "Aurora Viewing" : "Previewed Aurora Viewing"}
+        </div>
+        <TimeOffsetSlider
+          now={now ?? new Date()}
+          offsetHours={offsetHours}
+          setOffsetHours={setOffsetHours}
+          maxHours={MAX_HOURS}
+          tzName={tzName}
+          label="View at"
+        />
         <div className="space-y-3">
           <FactorRow label="Geomagnetic activity (Kp)" status={kp >= 5 ? "good" : kp >= 4 ? "fair" : "bad"}
-            note={`Kp = ${kp.toFixed(1)}. Aurora visible at geomagnetic latitudes ≥ ${threshold}°. Kp ≥ 5 = G1 storm; Kp ≥ 7 = G3 strong storm reaching mid-latitudes.`} />
+            note={`Kp = ${kp.toFixed(1)} (${kpSource}). Aurora visible at geomagnetic latitudes ≥ ${threshold}°. Kp ≥ 5 = G1 storm; Kp ≥ 7 = G3 strong storm reaching mid-latitudes.`} />
           <FactorRow label="Your geomagnetic latitude" status={absGeoLat >= threshold ? "good" : absGeoLat >= threshold - 5 ? "fair" : "bad"}
             note={`At ${absGeoLat.toFixed(1)}° geomag |lat| (geographic ${Math.abs(coords.lat).toFixed(1)}°), ${absGeoLat >= threshold ? "you're inside the auroral oval for this Kp." : "you'd need higher Kp or to travel poleward."}`} />
-          <FactorRow label="Cloud cover" status={weatherStale ? "unknown" : cloud == null ? "unknown" : cloud < 30 ? "good" : cloud < 60 ? "fair" : "bad"}
-            note={weatherStale ? "Out of weather forecast range — clouds excluded from score." : cloud != null ? `${cloud}% — aurora is in upper atmosphere (~100km) so any clouds block it entirely.` : "weather data unavailable"} />
-          <FactorRow label="Moon" status={sky.moonBrightness < 0.5 ? "good" : sky.moonBrightness < 2 ? "fair" : "bad"}
-            note={`${moonPhaseName(sky.phase.phaseFraction)}, sky brightening +${sky.moonBrightness.toFixed(2)} mag. Bright aurora overpowers moonlight; faint diffuse aurora gets washed out.`} />
+          <FactorRow label="Cloud cover"
+            status={previewCloudOutOfRange || (offsetHours === 0 && weatherStale) ? "unknown" : previewCloud == null ? "unknown" : previewCloud < 30 ? "good" : previewCloud < 60 ? "fair" : "bad"}
+            note={
+              previewCloudOutOfRange
+                ? "Beyond 16-day Open-Meteo forecast — clouds excluded from score."
+                : (offsetHours === 0 && weatherStale)
+                  ? "Out of weather forecast range — clouds excluded from score."
+                  : previewCloud != null
+                    ? `${previewCloud}% — aurora is in upper atmosphere (~100km) so any clouds block it entirely.`
+                    : "weather data unavailable"
+            } />
+          <FactorRow label="Moon" status={previewSky.moonBrightness < 0.5 ? "good" : previewSky.moonBrightness < 2 ? "fair" : "bad"}
+            note={`${moonPhaseName(previewSky.phase.phaseFraction)}, sky brightening +${previewSky.moonBrightness.toFixed(2)} mag. Bright aurora overpowers moonlight; faint diffuse aurora gets washed out.`} />
           <FactorRow label="City light pollution" status={bortle == null ? "unknown" : bortle <= 4 ? "good" : bortle <= 6 ? "fair" : "bad"}
             note={bortle != null ? `Bortle ${bortle}. Strong aurora visible from cities; subtle green glow needs Bortle ≤ 4. Look toward magnetic north — get away from streetlights.` : "Light-pollution atlas tile unavailable for this location."} />
-          <FactorRow label="Twilight" status={sky.tw.code === "night" ? "good" : sky.tw.code === "astro" || sky.tw.code === "nautical" ? "fair" : "bad"}
-            note={`${sky.tw.name}. Aurora visible during nautical twilight if strong, but full darkness gives best contrast.`} />
+          <FactorRow label="Twilight" status={previewSky.tw.code === "night" ? "good" : previewSky.tw.code === "astro" || previewSky.tw.code === "nautical" ? "fair" : "bad"}
+            note={`${previewSky.tw.name}. Aurora visible during nautical twilight if strong, but full darkness gives best contrast.`} />
         </div>
-        {weatherStale && <OutOfRangeNotice what="Cloud cover forecast" horizon="16 days from today" />}
+        {(weatherStale && offsetHours === 0) && <OutOfRangeNotice what="Cloud cover forecast" horizon="16 days from today" />}
       </div>
 
       {kpForecast && kpForecast.length > 0 && (
-        <Aurora3DaySlider kpForecast={kpForecast} weather={weather} coords={coords} threshold={threshold} geomagLat={geomagLat} />
+        <Aurora3DayChart
+          kpForecast={kpForecast}
+          now={now ?? new Date()}
+          offsetHours={offsetHours}
+          maxHours={MAX_HOURS}
+        />
       )}
     </div>
   );
@@ -128,85 +189,48 @@ function ViewingLatDiagram({ kp, userGeoLat, threshold }) {
   );
 }
 
-/* 3-day hourly slider over the SWPC forecast.
-   The forecast is at 3-hour resolution; we step in hourly increments and
-   pick the nearest 3h Kp bucket. Cloud cover is interpolated from Open-Meteo
-   when the chosen hour is in range. */
-function Aurora3DaySlider({ kpForecast, weather, coords, geomagLat }) {
-  // Build an hourly array starting from "now" out to the end of the forecast (or +72h).
+/* 72-hour Kp forecast spark with a cursor at the slider's current offset.
+   Pure visualization — the slider lives in the conditions panel above. */
+function Aurora3DayChart({ kpForecast, now, offsetHours, maxHours }) {
   const hourly = useMemo(() => {
-    if (!kpForecast || kpForecast.length === 0) return [];
+    if (!kpForecast || !kpForecast.length) return [];
     const out = [];
-    const now = new Date();
-    now.setMinutes(0, 0, 0);
-    const horizonMs = Math.min(72 * 3600000, kpForecast[kpForecast.length - 1].time.getTime() - now.getTime());
+    const start = new Date(now);
+    start.setMinutes(0, 0, 0);
+    const horizonMs = Math.min(maxHours * 3600000, kpForecast[kpForecast.length - 1].time.getTime() - start.getTime());
     const steps = Math.max(1, Math.floor(horizonMs / 3600000));
     for (let i = 0; i <= steps; i++) {
-      const t = new Date(now.getTime() + i * 3600000);
-      // pick nearest forecast bucket (≤ t)
+      const t = new Date(start.getTime() + i * 3600000);
       let bucket = kpForecast[0];
       for (const f of kpForecast) {
         if (f.time.getTime() <= t.getTime()) bucket = f;
         else break;
       }
-      out.push({ t, kp: bucket.kp, observed: bucket.observed });
+      out.push({ t, kp: bucket.kp });
     }
     return out;
-  }, [kpForecast]);
+  }, [kpForecast, now, maxHours]);
 
-  const [idx, setIdx] = useState(0);
-  if (hourly.length === 0) return null;
-  const sample = hourly[Math.min(idx, hourly.length - 1)];
-  const threshold = KP_VIEW_LAT[Math.floor(sample.kp)] ?? 50;
-  const absGeo = Math.abs(geomagLat);
-
-  // Cloud at this hour (Open-Meteo hourly is in location-local time; convert to UTC ms)
-  let cloudAt = null;
-  let cloudInRange = false;
-  if (weather?.hourly?.time && weather.hourly.cloud_cover) {
-    const tzOffsetSec = weather.utc_offset_seconds ?? 0;
-    const idxH = weather.hourly.time.findIndex((ts) => parseLocationTime(ts, tzOffsetSec) >= sample.t.getTime());
-    if (idxH >= 0) {
-      cloudAt = weather.hourly.cloud_cover[idxH];
-      cloudInRange = true;
-    }
-  }
-
-  const status =
-    absGeo < threshold ? { rating: "TOO FAR", color: "var(--text-muted)" }
-    : cloudInRange && cloudAt > 70 ? { rating: "CLOUDED", color: "var(--warning)" }
-    : sample.kp >= 5 ? { rating: "STORM", color: "var(--accent-green)" }
-    : { rating: "POSSIBLE", color: "var(--accent-gold)" };
+  if (!hourly.length) return null;
+  const cursorIdx = Math.min(offsetHours, hourly.length - 1);
 
   return (
     <div className="panel corner p-6">
-      <div className="mono text-xs uppercase tracking-widest mb-3 muted">3-Day Aurora Outlook · Hour-by-Hour</div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <DataCell label="Time" value={sample.t.toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" })} sub={sample.observed === "predicted" ? "predicted" : "observed"} />
-        <DataCell label="Kp" value={sample.kp.toFixed(2)} sub={`threshold ${threshold}°`} />
-        <DataCell label="Cloud" value={cloudInRange ? `${cloudAt}%` : "—"} sub={cloudInRange ? "" : "out of forecast"} />
-        <DataCell label="Status" value={status.rating} sub={absGeo >= threshold ? "in zone" : `need +${(threshold - absGeo).toFixed(1)}° geomag`} />
+      <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
+        <div className="mono text-xs uppercase tracking-widest muted">3-Day Kp Forecast</div>
+        <div className="mono text-xs subtle">Cursor follows the slider above</div>
       </div>
-      <input
-        type="range"
-        min="0"
-        max={hourly.length - 1}
-        step="1"
-        value={idx}
-        onChange={(e) => setIdx(parseInt(e.target.value))}
-        style={{ width: "100%" }}
-      />
+      <KpForecastSpark forecast={hourly} idx={cursorIdx} />
       <div className="mono text-xs flex justify-between mt-1 secondary">
         <span>{hourly[0].t.toLocaleString([], { weekday: "short", hour: "2-digit" })}</span>
-        <span>+{Math.floor((sample.t - hourly[0].t) / 3600000)}h</span>
+        <span>+{Math.floor((hourly[cursorIdx].t - hourly[0].t) / 3600000)}h · Kp {hourly[cursorIdx].kp.toFixed(2)}</span>
         <span>{hourly[hourly.length - 1].t.toLocaleString([], { weekday: "short", hour: "2-digit" })}</span>
       </div>
-      <KpForecastSpark forecast={hourly} idx={idx} threshold={threshold} />
     </div>
   );
 }
 
-function KpForecastSpark({ forecast, idx, threshold }) {
+function KpForecastSpark({ forecast, idx }) {
   const W = 700, H = 80, P = 20;
   const xScale = (i) => P + (i / Math.max(1, forecast.length - 1)) * (W - P * 2);
   const yScale = (kp) => H - P - (Math.min(kp, 9) / 9) * (H - P * 2);

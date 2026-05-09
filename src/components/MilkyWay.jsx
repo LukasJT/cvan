@@ -1,11 +1,35 @@
-import React from "react";
-import { fmtDeg, fmtTime, azimuthName, moonPhaseName } from "../astro.js";
-import { DataCell, FactorRow, OutOfRangeNotice } from "./shared.jsx";
+import React, { useMemo, useState } from "react";
+import {
+  fmtDeg, fmtTime, azimuthName, moonPhaseName,
+  computeSky, cloudCoverAt, BORTLE,
+} from "../astro.js";
+import { DataCell, FactorRow, OutOfRangeNotice, TimeOffsetSlider } from "./shared.jsx";
 import { milkyWayVerdict, cloudVerdict } from "../verdicts.js";
-import { BORTLE } from "../astro.js";
 
-export function MilkyWay({ sky, weather, bortle, bortleAuto, curve, coords, weatherStale }) {
+const MAX_HOURS = 7 * 24; // one week
+
+export function MilkyWay({ sky, weather, bortle, bortleAuto, curve, coords, now, weatherStale }) {
   if (!sky) return null;
+  const [offsetHours, setOffsetHours] = useState(0);
+  const tzName = weather?.timezone ?? null;
+
+  // Preview-time derived values (sky, cloud) used by the conditions panel.
+  const previewTime = useMemo(
+    () => new Date((now ?? new Date()).getTime() + offsetHours * 3600000),
+    [now, offsetHours]
+  );
+  const previewSky = useMemo(
+    () => offsetHours === 0 ? sky : computeSky(previewTime, coords),
+    [sky, previewTime, coords, offsetHours]
+  );
+  const previewCloud = useMemo(() => {
+    if (offsetHours === 0) return weatherStale ? null : weather?.current?.cloud_cover ?? null;
+    return cloudCoverAt(weather, previewTime.getTime());
+  }, [offsetHours, previewTime, weather, weatherStale]);
+  const previewCloudOutOfRange = offsetHours > 0 && previewCloud == null;
+
+  // The Right-Now panel and overall verdict stay anchored to the actual now,
+  // so the headline assessment doesn't change as you drag the slider.
   const cloud = weatherStale ? null : weather?.current?.cloud_cover ?? null;
   const verdict = milkyWayVerdict(sky, bortle ?? 4, cloud, curve);
   const bortleInfo = bortle != null ? BORTLE[bortle - 1] : null;
@@ -68,25 +92,43 @@ export function MilkyWay({ sky, weather, bortle, bortleAuto, curve, coords, weat
       )}
 
       <div className="panel corner p-6">
-        <div className="mono text-xs uppercase tracking-widest mb-3 muted">Conditions Affecting Tonight's View</div>
+        <div className="mono text-xs uppercase tracking-widest mb-3 muted">
+          Conditions Affecting {offsetHours === 0 ? "Tonight's View" : "Previewed View"}
+        </div>
+        <TimeOffsetSlider
+          now={now ?? new Date()}
+          offsetHours={offsetHours}
+          setOffsetHours={setOffsetHours}
+          maxHours={MAX_HOURS}
+          tzName={tzName}
+          label="View at"
+        />
         <div className="space-y-3">
           {bortleInfo ? (
             <FactorRow label="Light pollution (Bortle)" status={bortle <= 3 ? "good" : bortle <= 5 ? "fair" : "bad"} note={`Class ${bortle} — ${bortleInfo.name}. ${bortleInfo.mw}`} />
           ) : (
             <FactorRow label="Light pollution (Bortle)" status="unknown" note="Light-pollution atlas tile unavailable for this location — light pollution excluded from analysis." />
           )}
-          <FactorRow label="Moon" status={sky.moonBrightness < 0.3 ? "good" : sky.moonBrightness < 1.5 ? "fair" : "bad"}
-            note={`${moonPhaseName(sky.phase.phaseFraction)} (${(sky.phase.illumination * 100).toFixed(0)}% illuminated), altitude ${fmtDeg(sky.moonHz.alt)}. Sky brightening +${sky.moonBrightness.toFixed(2)} mag (Krisciunas-Schaefer model). Moon must be below horizon — and below roughly −5° to make moonlight negligible (Δ-V < 0.1 mag).`} />
-          <FactorRow label="Twilight" status={sky.tw.code === "night" ? "good" : sky.tw.code === "astro" ? "fair" : "bad"}
-            note={`${sky.tw.name} — sun at ${fmtDeg(sky.sunHz.alt)}. Galactic core requires astronomical night (sun < −18°) for full contrast.`} />
+          <FactorRow label="Moon" status={previewSky.moonBrightness < 0.3 ? "good" : previewSky.moonBrightness < 1.5 ? "fair" : "bad"}
+            note={`${moonPhaseName(previewSky.phase.phaseFraction)} (${(previewSky.phase.illumination * 100).toFixed(0)}% illuminated), altitude ${fmtDeg(previewSky.moonHz.alt)}. Sky brightening +${previewSky.moonBrightness.toFixed(2)} mag (Krisciunas-Schaefer model). Moon must be below horizon — and below roughly −5° to make moonlight negligible (Δ-V < 0.1 mag).`} />
+          <FactorRow label="Twilight" status={previewSky.tw.code === "night" ? "good" : previewSky.tw.code === "astro" ? "fair" : "bad"}
+            note={`${previewSky.tw.name} — sun at ${fmtDeg(previewSky.sunHz.alt)}. Galactic core requires astronomical night (sun < −18°) for full contrast.`} />
           <FactorRow
             label="Cloud cover"
-            status={weatherStale ? "unknown" : cloud == null ? "unknown" : cloud < 30 ? "good" : cloud < 60 ? "fair" : "bad"}
-            note={weatherStale ? "Out of weather forecast range — cloud cover not factored into score." : cloud != null ? `${cloud}% — ${cloudVerdict(cloud)}` : "weather data unavailable"} />
-          <FactorRow label="Galactic core altitude" status={sky.coreHz.alt > 30 ? "good" : sky.coreHz.alt > 10 ? "fair" : "bad"}
-            note={`Core at ${fmtDeg(sky.coreHz.alt)} altitude, ${fmtDeg(sky.coreHz.az)} azimuth (${azimuthName(sky.coreHz.az)}). Higher altitude = thinner atmosphere = more contrast. Best viewing >30°.`} />
+            status={previewCloudOutOfRange || (offsetHours === 0 && weatherStale) ? "unknown" : previewCloud == null ? "unknown" : previewCloud < 30 ? "good" : previewCloud < 60 ? "fair" : "bad"}
+            note={
+              previewCloudOutOfRange
+                ? "Beyond 16-day Open-Meteo forecast — cloud cover not factored into score."
+                : (offsetHours === 0 && weatherStale)
+                  ? "Out of weather forecast range — cloud cover not factored into score."
+                  : previewCloud != null
+                    ? `${previewCloud}% — ${cloudVerdict(previewCloud)}`
+                    : "weather data unavailable"
+            } />
+          <FactorRow label="Galactic core altitude" status={previewSky.coreHz.alt > 30 ? "good" : previewSky.coreHz.alt > 10 ? "fair" : "bad"}
+            note={`Core at ${fmtDeg(previewSky.coreHz.alt)} altitude, ${fmtDeg(previewSky.coreHz.az)} azimuth (${azimuthName(previewSky.coreHz.az)}). Higher altitude = thinner atmosphere = more contrast. Best viewing >30°.`} />
         </div>
-        {weatherStale && <OutOfRangeNotice what="Cloud cover forecast" horizon="16 days from today" />}
+        {(weatherStale && offsetHours === 0) && <OutOfRangeNotice what="Cloud cover forecast" horizon="16 days from today" />}
       </div>
     </div>
   );

@@ -238,6 +238,56 @@ export function parseLocationTime(ts, utcOffsetSec) {
   return Date.UTC(y, mo - 1, d, h, mi || 0, 0) - (utcOffsetSec || 0) * 1000;
 }
 
+/* Compute the full sky snapshot used everywhere in the app for a given
+   instant and observer. Mirrors the inline computation in CVAN.jsx so any
+   tab can preview a future moment without going through the app-level
+   `now` state. */
+export function computeSky(date, coords) {
+  const jd = toJulian(date);
+  const sun = sunPosition(jd);
+  const moon = moonPosition(jd);
+  const sidereal = lst(jd, coords.lon);
+  const sunHz = equatorialToHorizontal(sun.ra, sun.dec, sidereal, coords.lat);
+  const moonHz = equatorialToHorizontal(moon.ra, moon.dec, sidereal, coords.lat);
+  const coreHz = equatorialToHorizontal(GALACTIC_CORE.ra, GALACTIC_CORE.dec, sidereal, coords.lat);
+  const phase = moonPhase(jd);
+  const phaseAngle = Math.acos(2 * phase.illumination - 1) * RAD;
+  const moonBrightness = moonSkyBrightness(moonHz.alt, phaseAngle);
+  const tw = twilightClass(sunHz.alt);
+  return { jd, sun, moon, sunHz, moonHz, coreHz, phase, phaseAngle, moonBrightness, tw };
+}
+
+/* Hourly cloud-cover lookup from Open-Meteo response. Returns the
+   nearest-hour cloud_cover percentage if within 90 min of the target,
+   else null (out of forecast range). */
+export function cloudCoverAt(weather, targetMs) {
+  if (!weather?.hourly?.time || !weather.hourly.cloud_cover) return null;
+  const tz = weather.utc_offset_seconds ?? 0;
+  let bestIdx = -1, bestDelta = Infinity;
+  for (let i = 0; i < weather.hourly.time.length; i++) {
+    const t = parseLocationTime(weather.hourly.time[i], tz);
+    const d = Math.abs(t - targetMs);
+    if (d < bestDelta) { bestDelta = d; bestIdx = i; }
+  }
+  if (bestIdx < 0 || bestDelta > 90 * 60 * 1000) return null;
+  return weather.hourly.cloud_cover[bestIdx];
+}
+
+/* Latest-on-or-before Kp lookup from the SWPC 3-day forecast. Each
+   forecast entry covers a 3-hour bucket. Returns null if the target is
+   before the first bucket or after the last; the caller can fall back. */
+export function kpAt(kpForecast, targetMs) {
+  if (!Array.isArray(kpForecast) || !kpForecast.length) return null;
+  if (targetMs < kpForecast[0].time.getTime()) return null;
+  if (targetMs > kpForecast[kpForecast.length - 1].time.getTime() + 3 * 3600000) return null;
+  let bucket = kpForecast[0];
+  for (const f of kpForecast) {
+    if (f.time.getTime() <= targetMs) bucket = f;
+    else break;
+  }
+  return bucket;
+}
+
 /* Construct a Date for "wall-clock at location" given an anchor instant. */
 export function dateAtLocationWallClock(anchor, utcOffsetSec, hh, mm = 0) {
   const offsetMs = (utcOffsetSec || 0) * 1000;

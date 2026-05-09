@@ -89,6 +89,60 @@ export function ScoreDial({ score, label = "/ 100" }) {
   );
 }
 
+/* Forward-only time offset slider in 1-hour steps. Fits inside a panel
+   header strip — labels show NOW vs the previewed local time at the
+   user's location. `tzName` is optional; when provided, the previewed
+   time renders in that timezone instead of the browser's. */
+export function TimeOffsetSlider({ now, offsetHours, setOffsetHours, maxHours, tzName, label = "Forecast Time" }) {
+  const previewTime = new Date(now.getTime() + offsetHours * 3600000);
+  const fmt = (d, opts) =>
+    tzName ? d.toLocaleString([], { ...opts, timeZone: tzName })
+           : d.toLocaleString([], opts);
+  const labelFor = (h) => {
+    if (h === 0) return "NOW";
+    const d = new Date(now.getTime() + h * 3600000);
+    return fmt(d, { weekday: "short", hour: "2-digit", minute: "2-digit" }).toUpperCase();
+  };
+  const days = Math.floor(maxHours / 24);
+  return (
+    <div className="frame p-3 mb-3">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+        <div className="flex items-center gap-2">
+          <span className="mono text-xs uppercase tracking-widest muted">{label}</span>
+          <span className="display gold text-sm">{labelFor(offsetHours)}</span>
+          {offsetHours > 0 && (
+            <span className="mono text-xs subtle">
+              +{offsetHours < 24 ? `${offsetHours}h` : `${Math.floor(offsetHours / 24)}d ${offsetHours % 24}h`}
+            </span>
+          )}
+        </div>
+        <button
+          className="ghost"
+          onClick={() => setOffsetHours(0)}
+          disabled={offsetHours === 0}
+          style={{ fontSize: "0.65rem", padding: "0.25rem 0.6rem", opacity: offsetHours === 0 ? 0.4 : 1 }}
+        >
+          NOW
+        </button>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={maxHours}
+        step={1}
+        value={offsetHours}
+        onChange={(e) => setOffsetHours(parseInt(e.target.value))}
+        style={{ width: "100%" }}
+      />
+      <div className="mono text-xs flex justify-between mt-1 subtle">
+        <span>now</span>
+        <span>+{Math.floor(maxHours / 2 / 24) || 0}d {(maxHours / 2) % 24 ? `${(maxHours / 2) % 24}h` : ""}</span>
+        <span>+{days}d</span>
+      </div>
+    </div>
+  );
+}
+
 export function OutOfRangeNotice({ what, horizon }) {
   return (
     <div className="frame p-3 my-2" style={{ borderColor: "var(--warning)" }}>
