@@ -413,6 +413,9 @@ export default function CVAN() {
                 kpForecast={kpForecast}
                 now={now}
                 weatherStale={!weather}
+                bortleAuto={bortleAuto}
+                mapOverlays={mapOverlays}
+                setMapOverlays={setMapOverlays}
               />
             )}
             {tab === "kpforecast" && coords && (

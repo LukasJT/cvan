@@ -1,14 +1,18 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   fmtDeg, fmtTime, KP_VIEW_LAT, geomagneticLatitude, DEG, moonPhaseName,
-  computeSky, cloudCoverAt, kpAt,
+  computeSky, cloudCoverAt, kpAt, parseLocationTime,
 } from "../astro.js";
 import { DataCell, FactorRow, OutOfRangeNotice, TimeOffsetSlider } from "./shared.jsx";
+import { MapPanel } from "./MapPicker.jsx";
 import { auroraVerdict, cloudVerdict } from "../verdicts.js";
 
 const MAX_HOURS = 72; // three days
 
-export function Aurora({ aurora, weather, bortle, sky, coords, kpForecast, now, weatherStale }) {
+export function Aurora({
+  aurora, weather, bortle, sky, coords, kpForecast, now, weatherStale,
+  bortleAuto, mapOverlays, setMapOverlays,
+}) {
   if (!aurora) {
     return (
       <div className="panel corner p-6 text-center">
@@ -18,6 +22,70 @@ export function Aurora({ aurora, weather, bortle, sky, coords, kpForecast, now, 
     );
   }
 
+  const [mode, setMode] = useState("forecast");
+
+  return (
+    <div className="space-y-6">
+      <ModeToggle mode={mode} setMode={setMode} />
+      {mode === "forecast" ? (
+        <ForecastView
+          aurora={aurora} weather={weather} bortle={bortle} sky={sky}
+          coords={coords} kpForecast={kpForecast} now={now} weatherStale={weatherStale}
+        />
+      ) : (
+        <LiveView
+          aurora={aurora} weather={weather} bortle={bortle} sky={sky}
+          coords={coords} now={now} weatherStale={weatherStale}
+          bortleAuto={bortleAuto}
+        />
+      )}
+      <Aurora3DayMap
+        coords={coords}
+        weather={weather}
+        aurora={aurora}
+        bortleAuto={bortleAuto}
+        kpForecast={kpForecast}
+        now={now}
+        mapOverlays={mapOverlays}
+        setMapOverlays={setMapOverlays}
+      />
+    </div>
+  );
+}
+
+function ModeToggle({ mode, setMode }) {
+  const tabs = [
+    { key: "forecast", label: "Forecast", sub: "Plan a night" },
+    { key: "live", label: "Live · Now", sub: "Aurora-watching" },
+  ];
+  return (
+    <div className="panel corner p-2 flex gap-1">
+      {tabs.map((t) => (
+        <button
+          key={t.key}
+          onClick={() => setMode(t.key)}
+          className="ghost"
+          style={{
+            flex: 1,
+            padding: "0.6rem 0.8rem",
+            background: mode === t.key ? "var(--strip-bg)" : "transparent",
+            borderColor: mode === t.key ? "var(--accent-gold)" : "var(--frame-border)",
+            color: mode === t.key ? "var(--accent-gold)" : "var(--text-muted)",
+            cursor: "pointer",
+            borderRadius: 2,
+          }}
+        >
+          <div className="display" style={{ fontSize: "0.85rem", letterSpacing: "0.08em" }}>{t.label}</div>
+          <div className="mono" style={{ fontSize: "0.62rem", opacity: 0.75, marginTop: 2 }}>{t.sub}</div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ============================================================== FORECAST VIEW
+   Long-term planning: viewing geometry, conditions panel, 3-day Kp spark. */
+function ForecastView({ aurora, weather, bortle, sky, coords, kpForecast, now, weatherStale }) {
   const [offsetHours, setOffsetHours] = useState(0);
   const tzName = weather?.timezone ?? null;
 
@@ -26,7 +94,6 @@ export function Aurora({ aurora, weather, bortle, sky, coords, kpForecast, now, 
     [now, offsetHours]
   );
 
-  // Kp at the previewed time — falls through to current if outside forecast.
   const previewKpBucket = useMemo(() => {
     if (offsetHours === 0) return null;
     return kpAt(kpForecast, previewTime.getTime());
@@ -42,7 +109,6 @@ export function Aurora({ aurora, weather, bortle, sky, coords, kpForecast, now, 
   const geomagLat = geomagneticLatitude(coords.lat, coords.lon);
   const absGeoLat = Math.abs(geomagLat);
 
-  // Sky + cloud at preview time for the conditions panel.
   const previewSky = useMemo(
     () => offsetHours === 0 ? sky : computeSky(previewTime, coords),
     [sky, previewTime, coords, offsetHours]
@@ -53,7 +119,6 @@ export function Aurora({ aurora, weather, bortle, sky, coords, kpForecast, now, 
   }, [offsetHours, previewTime, weather, weatherStale]);
   const previewCloudOutOfRange = offsetHours > 0 && previewCloud == null;
 
-  // Headline verdict stays anchored to current Kp/cloud.
   const cloud = weatherStale ? null : weather?.current?.cloud_cover ?? null;
   const verdict = auroraVerdict(aurora, coords.lat, cloud, geomagLat);
 
@@ -132,6 +197,7 @@ export function Aurora({ aurora, weather, bortle, sky, coords, kpForecast, now, 
           kpForecast={kpForecast}
           now={now ?? new Date()}
           offsetHours={offsetHours}
+          setOffsetHours={setOffsetHours}
           maxHours={MAX_HOURS}
         />
       )}
@@ -139,8 +205,417 @@ export function Aurora({ aurora, weather, bortle, sky, coords, kpForecast, now, 
   );
 }
 
+/* ============================================================== LIVE VIEW
+   Real-time conditions while you're actively aurora-watching. Pulls
+   solar wind plasma + magnetic-field data from NOAA SWPC, refreshes
+   every minute, and surfaces the aurora-relevant numbers (Bz, wind
+   speed/density, IMF Bt). Plus tonight's viewing-conditions readout. */
+function LiveView({ aurora, weather, bortle, sky, coords, now, weatherStale, bortleAuto }) {
+  const plasma = useNoaaProductSeries("plasma");
+  const mag = useNoaaProductSeries("mag");
+
+  const latestP = plasma?.[plasma.length - 1];
+  const latestM = mag?.[mag.length - 1];
+
+  // Dim/dark countdown — astro night transitions for "today around now".
+  const tw = sky?.tw?.code ?? "day";
+  const sunAlt = sky?.sunHz?.alt ?? 0;
+  const cloudPct = weatherStale ? null : weather?.current?.cloud_cover ?? null;
+  const cloudTrend = useMemo(() => cloudTrendDescription(weather, now), [weather, now]);
+
+  // Aurora vigour heuristic from Bz: highly negative Bz (southward IMF) drives
+  // strong reconnection, hence aurora. Also factor wind speed > 500 km/s.
+  const bz = latestM?.bz ?? null;
+  const speed = latestP?.speed ?? null;
+  const density = latestP?.density ?? null;
+  const bt = latestM?.bt ?? null;
+
+  const auroraOutlook = useMemo(() => {
+    if (bz == null || speed == null) return { label: "—", color: "var(--text-muted)", note: "Awaiting solar wind data…" };
+    if (bz <= -10 && speed >= 500) return { label: "Active", color: "var(--accent-green)", note: "Strongly southward IMF Bz with fast wind — aurora likely intensifying." };
+    if (bz <= -5  && speed >= 400) return { label: "Possible", color: "var(--accent-gold)", note: "Southward Bz feeding the magnetosphere; watch for substorms." };
+    if (bz <= -3) return { label: "Quiet but tilted", color: "var(--accent-blue)", note: "Slightly southward Bz; only background activity expected." };
+    return { label: "Quiet", color: "var(--text-muted)", note: "Bz northward — magnetosphere closed, aurora unlikely to brighten." };
+  }, [bz, speed]);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="panel corner p-6 text-center">
+          <div className="mono text-xs uppercase tracking-widest mb-2 muted">Live Kp · 1-min</div>
+          <BigNumber value={aurora.kp.toFixed(1)} unit="Kp" color={kpColor(aurora.kp)} />
+          <div className="mono text-xs mt-2 muted">
+            updated {new Date(aurora.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          </div>
+        </div>
+        <div className="panel corner p-6 text-center">
+          <div className="mono text-xs uppercase tracking-widest mb-2 muted">Outlook · IMF + Wind</div>
+          <div className="display text-2xl" style={{ color: auroraOutlook.color, letterSpacing: "0.1em" }}>
+            {auroraOutlook.label.toUpperCase()}
+          </div>
+          <div className="body text-sm mt-2 secondary">{auroraOutlook.note}</div>
+        </div>
+        <div className="panel corner p-6 text-center">
+          <div className="mono text-xs uppercase tracking-widest mb-2 muted">Sky right now</div>
+          <SkySummaryBlock sunAlt={sunAlt} tw={tw} sky={sky} bortle={bortle} bortleAuto={bortleAuto} cloud={cloudPct} cloudTrend={cloudTrend} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <SeriesCard
+          title="Solar wind speed"
+          unit="km/s"
+          value={speed != null ? speed.toFixed(0) : "—"}
+          accent={speed >= 500 ? "var(--accent-green)" : speed >= 400 ? "var(--accent-gold)" : "var(--text-muted)"}
+          series={plasma?.map((d) => ({ t: d.t, v: d.speed }))}
+          yMin={250} yMax={900}
+          lines={[{ y: 500, label: "fast" }]}
+        />
+        <SeriesCard
+          title="IMF Bz · GSM"
+          unit="nT"
+          value={bz != null ? bz.toFixed(1) : "—"}
+          subtitle={bz != null && bz < 0 ? "southward — feeds aurora" : bz != null ? "northward — quiet" : ""}
+          accent={bz != null && bz <= -5 ? "var(--accent-green)" : bz != null && bz <= -3 ? "var(--accent-gold)" : "var(--text-muted)"}
+          series={mag?.map((d) => ({ t: d.t, v: d.bz }))}
+          yMin={-25} yMax={25}
+          zeroLine
+          lines={[{ y: -5, label: "−5 nT" }]}
+        />
+        <SeriesCard
+          title="Solar wind density"
+          unit="p/cm³"
+          value={density != null ? density.toFixed(1) : "—"}
+          accent={density >= 10 ? "var(--accent-green)" : "var(--text-muted)"}
+          series={plasma?.map((d) => ({ t: d.t, v: d.density }))}
+          yMin={0} yMax={30}
+        />
+        <SeriesCard
+          title="IMF total · Bt"
+          unit="nT"
+          value={bt != null ? bt.toFixed(1) : "—"}
+          subtitle="vector magnitude of B"
+          accent={bt >= 10 ? "var(--accent-green)" : "var(--text-muted)"}
+          series={mag?.map((d) => ({ t: d.t, v: d.bt }))}
+          yMin={0} yMax={30}
+        />
+      </div>
+
+      <div className="panel corner p-6">
+        <div className="mono text-xs uppercase tracking-widest mb-3 muted">Tonight's viewing conditions</div>
+        <ConditionsStrip
+          sky={sky}
+          cloud={cloudPct}
+          cloudTrend={cloudTrend}
+          weatherStale={weatherStale}
+          bortle={bortle}
+          bortleAuto={bortleAuto}
+          weather={weather}
+          now={now}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* Bottom 3-day map, embedded in both modes. The user can scroll a
+   slider to see the auroral oval and day/night terminator at any time
+   in the next 3 days. The user's location is pinned (clicks suppressed)
+   so they can see the oval shift relative to where they actually are. */
+function Aurora3DayMap({ coords, weather, aurora, bortleAuto, kpForecast, now, mapOverlays, setMapOverlays }) {
+  const [offsetHours, setOffsetHours] = useState(0);
+  const tzName = weather?.timezone ?? null;
+  const previewTime = useMemo(
+    () => new Date((now ?? new Date()).getTime() + offsetHours * 3600000),
+    [now, offsetHours]
+  );
+  // Override Kp with the previewed-time Kp so the oval intensity colour
+  // shifts with the slider.
+  const previewKp = useMemo(() => {
+    if (offsetHours === 0) return aurora?.kp;
+    const b = kpAt(kpForecast, previewTime.getTime());
+    return b ? b.kp : aurora?.kp;
+  }, [aurora, kpForecast, previewTime, offsetHours]);
+
+  const syntheticAurora = useMemo(
+    () => aurora ? { ...aurora, kp: previewKp } : null,
+    [aurora, previewKp]
+  );
+
+  // Always force the oval and day/night on for this map; users came here
+  // specifically to see the oval, and the day/night band is the most
+  // useful context for whether aurora is observable at the cursor time.
+  const auroraMapOverlays = useMemo(
+    () => ({ ...(mapOverlays ?? {}), auroralOval: true, daynight: true }),
+    [mapOverlays]
+  );
+
+  return (
+    <div className="panel corner p-6">
+      <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
+        <div className="mono text-xs uppercase tracking-widest muted">3-Day Auroral Oval Map</div>
+        <div className="mono text-xs subtle">Slide to see how the oval moves; pin = your location</div>
+      </div>
+      <TimeOffsetSlider
+        now={now ?? new Date()}
+        offsetHours={offsetHours}
+        setOffsetHours={setOffsetHours}
+        maxHours={MAX_HOURS}
+        tzName={tzName}
+        label="Map time"
+      />
+      <MapPanel
+        coords={coords}
+        onPick={() => { /* read-only — preserve user's chosen coords */ }}
+        weather={weather}
+        aurora={syntheticAurora}
+        bortleAuto={bortleAuto}
+        now={previewTime}
+        overlays={auroraMapOverlays}
+        setOverlays={setMapOverlays}
+      />
+    </div>
+  );
+}
+
+/* ============================================================== HELPERS */
+
+function BigNumber({ value, unit, color }) {
+  return (
+    <div>
+      <span className="display" style={{ color, fontSize: "3.4rem", lineHeight: 1, letterSpacing: "0.04em" }}>{value}</span>
+      <span className="mono text-xs muted" style={{ marginLeft: 6 }}>{unit}</span>
+    </div>
+  );
+}
+
+function kpColor(kp) {
+  if (kp >= 7) return "var(--error)";
+  if (kp >= 5) return "var(--warning)";
+  if (kp >= 4) return "var(--accent-gold)";
+  if (kp >= 3) return "var(--accent-green)";
+  return "var(--text-muted)";
+}
+
+function SeriesCard({ title, unit, value, subtitle, accent, series, yMin, yMax, lines = [], zeroLine }) {
+  return (
+    <div className="panel corner p-5">
+      <div className="flex items-baseline justify-between mb-2 flex-wrap gap-2">
+        <div className="mono text-xs uppercase tracking-widest muted">{title}</div>
+        {subtitle && <div className="mono text-xs subtle">{subtitle}</div>}
+      </div>
+      <div>
+        <span className="display" style={{ color: accent, fontSize: "2rem", lineHeight: 1 }}>{value}</span>
+        <span className="mono text-xs muted" style={{ marginLeft: 4 }}>{unit}</span>
+      </div>
+      <MiniSpark series={series} yMin={yMin} yMax={yMax} accent={accent} lines={lines} zeroLine={zeroLine} />
+    </div>
+  );
+}
+
+function MiniSpark({ series, yMin, yMax, accent, lines = [], zeroLine }) {
+  if (!series || series.length < 2) {
+    return <div className="mono text-xs subtle mt-3" style={{ height: 60 }}>Awaiting data…</div>;
+  }
+  const W = 600, H = 60, P = 4;
+  const xs = series.map((_, i) => P + (i / (series.length - 1)) * (W - P * 2));
+  const yScale = (v) => {
+    const t = (v - yMin) / (yMax - yMin);
+    return H - P - Math.max(0, Math.min(1, t)) * (H - P * 2);
+  };
+  const path = series.map((d, i) =>
+    Number.isFinite(d.v) ? `${i === 0 ? "M" : "L"} ${xs[i]} ${yScale(d.v)}` : ""
+  ).join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ marginTop: 8 }}>
+      {zeroLine && (
+        <line x1={P} y1={yScale(0)} x2={W - P} y2={yScale(0)} stroke="var(--text-muted)" strokeDasharray="2 4" strokeWidth="0.5" opacity="0.4" />
+      )}
+      {lines.map((l, i) => (
+        <g key={i}>
+          <line x1={P} y1={yScale(l.y)} x2={W - P} y2={yScale(l.y)} stroke="var(--text-muted)" strokeDasharray="2 4" strokeWidth="0.5" opacity="0.4" />
+          {l.label && <text x={P + 2} y={yScale(l.y) - 2} fontSize="7" fontFamily="JetBrains Mono" fill="var(--text-muted)">{l.label}</text>}
+        </g>
+      ))}
+      <path d={path} fill="none" stroke={accent} strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function SkySummaryBlock({ sunAlt, tw, sky, bortle, bortleAuto, cloud, cloudTrend }) {
+  return (
+    <div className="text-left mt-2 mono text-xs space-y-1">
+      <div>
+        <span className="muted">Twilight: </span>
+        <span className="gold">{sky?.tw?.name ?? "—"}</span>
+        <span className="subtle"> · sun {sunAlt.toFixed(0)}°</span>
+      </div>
+      <div>
+        <span className="muted">Moon: </span>
+        <span className="gold">{moonPhaseName(sky?.phase?.phaseFraction ?? 0)}</span>
+        <span className="subtle"> · brightening +{(sky?.moonBrightness ?? 0).toFixed(2)} mag</span>
+      </div>
+      <div>
+        <span className="muted">Bortle: </span>
+        <span className="gold">{bortle != null ? `Class ${bortle}` : "—"}</span>
+        {bortleAuto && <span className="subtle"> · SQM {bortleAuto.sqm.toFixed(2)}</span>}
+      </div>
+      <div>
+        <span className="muted">Cloud: </span>
+        <span className="gold">{cloud != null ? `${cloud}%` : "—"}</span>
+        {cloudTrend && <span className="subtle"> · {cloudTrend}</span>}
+      </div>
+    </div>
+  );
+}
+
+function ConditionsStrip({ sky, cloud, cloudTrend, weatherStale, bortle, bortleAuto, weather, now }) {
+  const tzOffsetSec = weather?.utc_offset_seconds ?? 0;
+  const tw = sky?.tw?.code ?? "day";
+  const darknessLeft = useMemo(() => {
+    if (!weather || !sky || !sky.twilights?.astro) return null;
+    const t = sky.twilights.astro;
+    return darknessCountdown(now ?? new Date(), t, tw);
+  }, [weather, sky, now, tw]);
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <DataCell
+        label="Darkness"
+        value={darknessLeft?.value ?? "—"}
+        sub={darknessLeft?.sub ?? sky?.tw?.name ?? ""}
+      />
+      <DataCell
+        label="Clouds (now)"
+        value={cloud != null ? `${cloud}%` : "—"}
+        sub={cloudTrend ?? (weatherStale ? "out of forecast" : "")}
+      />
+      <DataCell
+        label="Moon"
+        value={sky ? `+${sky.moonBrightness.toFixed(1)} mag` : "—"}
+        sub={sky ? `${moonPhaseName(sky.phase.phaseFraction)} · alt ${fmtDeg(sky.moonHz.alt)}` : ""}
+      />
+      <DataCell
+        label="Light pollution"
+        value={bortle != null ? `Bortle ${bortle}` : "—"}
+        sub={bortleAuto ? `SQM ${bortleAuto.sqm.toFixed(2)} · zone ${bortleAuto.zone}` : ""}
+      />
+    </div>
+  );
+}
+
+/* Estimate how long the current cloud-cover bucket persists in Open-Meteo's
+   hourly forecast. "Bucket" = same coarse category as the current value
+   (clear / partly / mostly / overcast). Returns a short status string. */
+function cloudTrendDescription(weather, now) {
+  if (!weather?.hourly?.time || !weather?.hourly?.cloud_cover) return null;
+  const cur = weather.current?.cloud_cover;
+  if (cur == null) return null;
+  const tz = weather.utc_offset_seconds ?? 0;
+  const nowMs = (now ?? new Date()).getTime();
+  const bucket = (c) => c < 30 ? 0 : c < 60 ? 1 : c < 85 ? 2 : 3;
+  const curB = bucket(cur);
+  let lastSameMs = nowMs;
+  for (let i = 0; i < weather.hourly.time.length; i++) {
+    const t = parseLocationTime(weather.hourly.time[i], tz);
+    if (t < nowMs) continue;
+    const c = weather.hourly.cloud_cover[i];
+    if (bucket(c) === curB) lastSameMs = t;
+    else break;
+  }
+  const dh = (lastSameMs - nowMs) / 3600000;
+  if (dh < 0.5) return "changing soon";
+  if (dh < 2)   return `holds ~${dh.toFixed(0)}h`;
+  return `holds ${dh.toFixed(0)}h+`;
+}
+
+function darknessCountdown(now, twilightEvents, currentCode) {
+  const nowMs = now.getTime();
+  // Find the next astronomical-night transition after now.
+  const events = [twilightEvents.rise, twilightEvents.set]
+    .filter(Boolean)
+    .map((t) => ({ t, after: t.getTime() - nowMs }))
+    .filter((e) => e.after > 0)
+    .sort((a, b) => a.after - b.after);
+  if (currentCode === "night") {
+    // Find when astro night ends (= sun rises above -18°)
+    const next = events.find((e) => e.t === twilightEvents.rise);
+    if (!next) return { value: "—", sub: "ends after horizon" };
+    return { value: hoursMins(next.after), sub: `dark until ${fmtTime(next.t)}` };
+  }
+  // Otherwise: time till astro night begins
+  const next = events.find((e) => e.t === twilightEvents.set);
+  if (!next) return { value: "—", sub: "no astro night tonight" };
+  return { value: hoursMins(next.after), sub: `dark from ${fmtTime(next.t)}` };
+}
+
+function hoursMins(ms) {
+  if (ms <= 0) return "—";
+  const totalMin = Math.round(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m}m`;
+  return `${h}h ${m}m`;
+}
+
+/* React hook: fetch a NOAA SWPC product (plasma or mag), parse, and
+   refresh every 60 seconds. Returns the parsed series of objects with
+   numeric fields and a Date `t`, or null while loading. */
+function useNoaaProductSeries(kind) {
+  const [series, setSeries] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    const url = kind === "plasma"
+      ? "https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json"
+      : "https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json";
+    const fetchOnce = async () => {
+      try {
+        const r = await fetch(url, { cache: "no-store" });
+        if (!r.ok) return;
+        const rows = await r.json();
+        if (cancelled || !Array.isArray(rows) || rows.length < 2) return;
+        const headers = rows[0];
+        const idx = (k) => headers.indexOf(k);
+        const ti = idx("time_tag");
+        if (kind === "plasma") {
+          const di = idx("density"), si = idx("speed"), tpi = idx("temperature");
+          setSeries(rows.slice(1).slice(-180).map((r) => ({
+            t: parseSwpcTime(r[ti]),
+            density: parseFloat(r[di]),
+            speed: parseFloat(r[si]),
+            temp: parseFloat(r[tpi]),
+          })));
+        } else {
+          const bxi = idx("bx_gsm"), byi = idx("by_gsm"), bzi = idx("bz_gsm"), bti = idx("bt");
+          setSeries(rows.slice(1).slice(-180).map((r) => ({
+            t: parseSwpcTime(r[ti]),
+            bx: parseFloat(r[bxi]),
+            by: parseFloat(r[byi]),
+            bz: parseFloat(r[bzi]),
+            bt: parseFloat(r[bti]),
+          })));
+        }
+      } catch {/* network blip — keep showing the last value */}
+    };
+    fetchOnce();
+    const id = setInterval(fetchOnce, 60 * 1000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [kind]);
+  return series;
+}
+
+function parseSwpcTime(s) {
+  // SWPC format: "YYYY-MM-DD HH:MM:SS.sss" — interpret as UTC.
+  if (!s) return null;
+  const [date, time] = s.split(" ");
+  const [Y, M, D] = date.split("-").map(Number);
+  const [h, m, sec] = time.split(":");
+  return new Date(Date.UTC(Y, M - 1, D, +h, +m, Math.floor(parseFloat(sec))));
+}
+
+/* ============================================================== STATIC SVGs */
 function KpDial({ kp }) {
-  const color = kp >= 7 ? "var(--error)" : kp >= 5 ? "var(--warning)" : kp >= 4 ? "var(--accent-gold)" : kp >= 3 ? "var(--accent-green)" : "var(--text-muted)";
+  const color = kpColor(kp);
   return (
     <svg viewBox="0 0 200 130" width="100%" style={{ maxWidth: "240px", margin: "0 auto", display: "block" }}>
       <path d="M 20 110 A 80 80 0 0 1 180 110" fill="none" stroke="var(--panel-border)" strokeWidth="14" />
@@ -189,9 +664,9 @@ function ViewingLatDiagram({ kp, userGeoLat, threshold }) {
   );
 }
 
-/* 72-hour Kp forecast spark with a cursor at the slider's current offset.
-   Pure visualization — the slider lives in the conditions panel above. */
-function Aurora3DayChart({ kpForecast, now, offsetHours, maxHours }) {
+/* 72-hour Kp forecast spark with a draggable cursor. Click or drag
+   anywhere on the chart to set the slider. */
+function Aurora3DayChart({ kpForecast, now, offsetHours, setOffsetHours, maxHours }) {
   const hourly = useMemo(() => {
     if (!kpForecast || !kpForecast.length) return [];
     const out = [];
@@ -218,30 +693,91 @@ function Aurora3DayChart({ kpForecast, now, offsetHours, maxHours }) {
     <div className="panel corner p-6">
       <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
         <div className="mono text-xs uppercase tracking-widest muted">3-Day Kp Forecast</div>
-        <div className="mono text-xs subtle">Cursor follows the slider above</div>
+        <div className="mono text-xs subtle">Drag the cursor or move the slider above</div>
       </div>
-      <KpForecastSpark forecast={hourly} idx={cursorIdx} />
+      <KpForecastSpark
+        forecast={hourly}
+        idx={cursorIdx}
+        onScrub={(idx) => setOffsetHours?.(idx)}
+        maxHours={maxHours}
+      />
       <div className="mono text-xs flex justify-between mt-1 secondary">
         <span>{hourly[0].t.toLocaleString([], { weekday: "short", hour: "2-digit" })}</span>
-        <span>+{Math.floor((hourly[cursorIdx].t - hourly[0].t) / 3600000)}h · Kp {hourly[cursorIdx].kp.toFixed(2)}</span>
+        <span>
+          {hourly[cursorIdx].t.toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" })}
+          {" · +"}{Math.floor((hourly[cursorIdx].t - hourly[0].t) / 3600000)}h
+          {" · Kp "}{hourly[cursorIdx].kp.toFixed(2)}
+        </span>
         <span>{hourly[hourly.length - 1].t.toLocaleString([], { weekday: "short", hour: "2-digit" })}</span>
       </div>
     </div>
   );
 }
 
-function KpForecastSpark({ forecast, idx }) {
+function KpForecastSpark({ forecast, idx, onScrub, maxHours }) {
   const W = 700, H = 80, P = 20;
   const xScale = (i) => P + (i / Math.max(1, forecast.length - 1)) * (W - P * 2);
   const yScale = (kp) => H - P - (Math.min(kp, 9) / 9) * (H - P * 2);
   const path = forecast.map((s, i) => `${i === 0 ? "M" : "L"} ${xScale(i)} ${yScale(s.kp)}`).join(" ");
+  const svgRef = useRef(null);
+  const dragRef = useRef(false);
+
+  const xToOffsetHours = (clientX) => {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const rect = svg.getBoundingClientRect();
+    const fx = (clientX - rect.left) / rect.width;
+    const xViewBox = fx * W;
+    const i = Math.round(((xViewBox - P) / (W - P * 2)) * (forecast.length - 1));
+    return Math.max(0, Math.min(maxHours ?? forecast.length - 1, i));
+  };
+
+  const begin = (e) => {
+    if (!onScrub) return;
+    dragRef.current = true;
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    const i = xToOffsetHours(cx);
+    if (i != null) onScrub(i);
+    e.preventDefault();
+  };
+
+  useEffect(() => {
+    if (!onScrub) return;
+    const move = (e) => {
+      if (!dragRef.current) return;
+      const cx = e.touches ? e.touches[0].clientX : e.clientX;
+      const i = xToOffsetHours(cx);
+      if (i != null) onScrub(i);
+    };
+    const onUp = () => { dragRef.current = false; };
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchend", onUp);
+    window.addEventListener("mousemove", move);
+    window.addEventListener("touchmove", move, { passive: false });
+    return () => {
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchend", onUp);
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("touchmove", move);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onScrub, forecast.length, maxHours]);
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ marginTop: 6 }}>
+    <svg
+      ref={svgRef}
+      viewBox={`0 0 ${W} ${H}`}
+      width="100%"
+      style={{ marginTop: 6, cursor: onScrub ? "ew-resize" : "default", touchAction: "none", userSelect: "none" }}
+      onMouseDown={begin}
+      onTouchStart={begin}
+    >
       {[3, 5, 7].map((k) => (
         <line key={k} x1={P} y1={yScale(k)} x2={W - P} y2={yScale(k)} stroke="var(--text-muted)" strokeDasharray="2 4" strokeWidth="0.5" opacity="0.4" />
       ))}
       <path d={path} fill="none" stroke="var(--accent-purple)" strokeWidth="1.5" />
-      <line x1={xScale(idx)} y1={P} x2={xScale(idx)} y2={H - P} stroke="var(--accent-gold)" strokeWidth="1.5" />
+      <line x1={xScale(idx)} y1={P} x2={xScale(idx)} y2={H - P} stroke="var(--accent-gold)" strokeWidth="2" />
+      <circle cx={xScale(idx)} cy={yScale(forecast[idx]?.kp ?? 0)} r="4" fill="var(--accent-gold)" stroke="var(--bg-base)" strokeWidth="1.5" />
       <text x={P} y={yScale(5) - 2} fontSize="8" fontFamily="JetBrains Mono" fill="var(--warning)" opacity="0.7">Kp 5 (G1)</text>
     </svg>
   );
