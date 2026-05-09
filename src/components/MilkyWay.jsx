@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from "react";
 import {
   fmtDeg, fmtTime, azimuthName, moonPhaseName,
-  computeSky, cloudCoverAt, BORTLE,
+  computeSky, cloudCoverAt, altitudeCurve, BORTLE,
 } from "../astro.js";
-import { DataCell, FactorRow, OutOfRangeNotice, TimeOffsetSlider } from "./shared.jsx";
+import { DataCell, FactorRow, OutOfRangeNotice, TimeOffsetSlider, Legend } from "./shared.jsx";
 import { milkyWayVerdict, cloudVerdict } from "../verdicts.js";
+import { AltitudeChart } from "./Overview.jsx";
 
 const MAX_HOURS = 7 * 24; // one week
 
@@ -129,6 +130,85 @@ export function MilkyWay({ sky, weather, bortle, bortleAuto, curve, coords, now,
             note={`Core at ${fmtDeg(previewSky.coreHz.alt)} altitude, ${fmtDeg(previewSky.coreHz.az)} azimuth (${azimuthName(previewSky.coreHz.az)}). Higher altitude = thinner atmosphere = more contrast. Best viewing >30°.`} />
         </div>
         {(weatherStale && offsetHours === 0) && <OutOfRangeNotice what="Cloud cover forecast" horizon="16 days from today" />}
+      </div>
+
+      <MilkyWayNightChart coords={coords} now={now ?? new Date()} tzName={tzName} />
+    </div>
+  );
+}
+
+/* "Night by night" chart at the bottom of the Milky Way tab. Same visual
+   as Tonight's altitude chart, but with its own day-resolution slider so
+   the user can scrub forward through the next week and see how the
+   Milky Way band rises/sets vs. the moon and sun on each future night. */
+function MilkyWayNightChart({ coords, now, tzName }) {
+  const [dayOffset, setDayOffset] = useState(0);
+  const anchor = useMemo(() => {
+    const d = new Date(now);
+    d.setDate(d.getDate() + dayOffset);
+    return d;
+  }, [now, dayOffset]);
+
+  const curve = useMemo(() => altitudeCurve(anchor, coords.lat, coords.lon), [anchor, coords.lat, coords.lon]);
+
+  const fmt = (d, opts) =>
+    tzName ? d.toLocaleString([], { ...opts, timeZone: tzName })
+           : d.toLocaleString([], opts);
+
+  return (
+    <div className="panel corner p-6">
+      <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
+        <div className="mono text-xs uppercase tracking-widest muted">Milky Way · Altitude vs Time · Night-by-Night</div>
+        <div className="mono text-xs subtle">Drag the slider to scrub through the next 7 nights</div>
+      </div>
+
+      <div className="frame p-3 mb-3">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="mono text-xs uppercase tracking-widest muted">Night of</span>
+            <span className="display gold text-sm">
+              {fmt(anchor, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+            </span>
+            {dayOffset > 0 && <span className="mono text-xs subtle">+{dayOffset} day{dayOffset === 1 ? "" : "s"}</span>}
+          </div>
+          <button
+            className="ghost"
+            onClick={() => setDayOffset(0)}
+            disabled={dayOffset === 0}
+            style={{ opacity: dayOffset === 0 ? 0.4 : 1, padding: "0.25rem 0.6rem", fontSize: "0.65rem" }}
+          >
+            TONIGHT
+          </button>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={7}
+          step={1}
+          value={dayOffset}
+          onChange={(e) => setDayOffset(parseInt(e.target.value))}
+          style={{ width: "100%" }}
+        />
+        <div className="mono text-xs flex justify-between mt-1 subtle">
+          <span>tonight</span>
+          <span>+3d</span>
+          <span>+7d</span>
+        </div>
+      </div>
+
+      <AltitudeChart curve={curve} />
+      <div className="mt-3 flex gap-4 mono text-xs flex-wrap secondary">
+        <Legend color="var(--accent-warm)" label="Sun" />
+        <Legend color="#e8e8e8" label="Moon" />
+        <Legend color="var(--accent-purple)" label="Milky Way Core (Sgr A*)" />
+        <Legend color="var(--accent-purple)" label="Milky Way band (Scorpius → Cassiopeia)" />
+        <Legend color="var(--accent-green)" label="Astronomical night" dashed />
+      </div>
+      <div className="mono text-xs mt-2 subtle">
+        Faint purple curves trace the bright Milky Way band sampled at named landmarks
+        (Norma → Sagittarius → Aquila → Cygnus → Cassiopeia). The translucent envelope
+        shows the band's angular extent above the horizon at each moment — its tilt
+        across the chart reflects how the band is angled in the sky as it sweeps overhead.
       </div>
     </div>
   );

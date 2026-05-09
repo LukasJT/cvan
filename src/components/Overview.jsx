@@ -1,5 +1,5 @@
 import React from "react";
-import { fmtDeg, fmtTime, geomagneticLatitude } from "../astro.js";
+import { fmtDeg, fmtTime, geomagneticLatitude, MILKY_WAY_BAND_POINTS } from "../astro.js";
 import { DataCell, ScoreRow, Legend, VerdictCard, ScoreDial } from "./shared.jsx";
 import { milkyWayVerdict, auroraVerdict, deepSkyVerdict, auroraVerdictShort, cloudVerdict } from "../verdicts.js";
 import { moonPhaseName } from "../astro.js";
@@ -47,6 +47,7 @@ export function Overview({ sky, weather, aurora, bortle, score, curve, coords, w
           <Legend color="var(--accent-warm)" label="Sun" />
           <Legend color="#e8e8e8" label="Moon" />
           <Legend color="var(--accent-purple)" label="Milky Way Core" />
+          <Legend color="var(--accent-purple)" label="Milky Way band (Scorpius → Cassiopeia)" />
           <Legend color="var(--accent-green)" label="Astronomical night" dashed />
         </div>
       </div>
@@ -69,6 +70,33 @@ export function AltitudeChart({ curve }) {
   const linePath = (key) =>
     curve.map((s, i) => `${i === 0 ? "M" : "L"} ${xScale(s.h)} ${yScale(s[key])}`).join(" ");
 
+  /* Build a closed polygon for the bright Milky Way band envelope.
+     For each time sample we take the min/max of the band-point altitudes
+     (the curve's bandAlt array) — that gives the angular extent of the
+     band above/below the horizon at that moment. The polygon walks the
+     upper edge forward then the lower edge backward. Visually you see
+     the band swelling and tilting as it sweeps across the sky. */
+  const upper = curve.map((s) => Math.max(...(s.bandAlt ?? [s.coreAlt])));
+  const lower = curve.map((s) => Math.min(...(s.bandAlt ?? [s.coreAlt])));
+  const envelopePts = [
+    ...curve.map((s, i) => `${xScale(s.h)},${yScale(upper[i])}`),
+    ...[...curve].reverse().map((s, i) => {
+      const idx = curve.length - 1 - i;
+      return `${xScale(s.h)},${yScale(lower[idx])}`;
+    }),
+  ].join(" ");
+
+  /* Per-point lines for each named position along the band. The brighter
+     core stays bold; the rest are faint to suggest the band's reach. */
+  const bandPaths = (MILKY_WAY_BAND_POINTS ?? []).map((p, idx) => {
+    const isCore = p.l === 0;
+    const path = curve.map((s, i) => {
+      const v = s.bandAlt?.[idx];
+      return v == null ? "" : `${i === 0 ? "M" : "L"} ${xScale(s.h)} ${yScale(v)}`;
+    }).join(" ");
+    return { path, isCore, label: p.label };
+  });
+
   const nightBands = [];
   let bandStart = null;
   curve.forEach((s) => {
@@ -85,11 +113,20 @@ export function AltitudeChart({ curve }) {
       {nightBands.map(([a, b], i) => (
         <rect key={i} x={xScale(a)} y={P} width={xScale(b) - xScale(a)} height={H - P * 2} fill="rgba(109,255,176,0.06)" />
       ))}
+      {/* Milky Way band envelope (low alpha) — shows the angular extent */}
+      <polygon points={envelopePts} fill="var(--accent-purple)" opacity="0.10" />
+      {/* Per-point band lines (faint) */}
+      {bandPaths.map((b, i) => (
+        b.isCore ? null : (
+          <path key={i} d={b.path} fill="none" stroke="var(--accent-purple)" strokeWidth="0.8" opacity="0.45" />
+        )
+      ))}
       <line x1={P} y1={yScale(0)} x2={W - P} y2={yScale(0)} stroke="var(--accent-gold)" strokeWidth="1" strokeDasharray="2 4" opacity="0.5" />
       <line x1={P} y1={yScale(-18)} x2={W - P} y2={yScale(-18)} stroke="var(--accent-green)" strokeWidth="0.5" strokeDasharray="2 4" opacity="0.3" />
       <path d={linePath("sunAlt")} fill="none" stroke="var(--accent-warm)" strokeWidth="1.5" />
       <path d={linePath("moonAlt")} fill="none" stroke="#e8e8e8" strokeWidth="1.5" />
-      <path d={linePath("coreAlt")} fill="none" stroke="var(--accent-purple)" strokeWidth="1.5" />
+      {/* Core line drawn on top, bold */}
+      <path d={linePath("coreAlt")} fill="none" stroke="var(--accent-purple)" strokeWidth="2" />
       <text x={P} y={yScale(0) - 4} fontSize="9" fontFamily="JetBrains Mono" fill="var(--accent-gold)" opacity="0.7">HORIZON</text>
       <text x={P} y={yScale(-18) - 4} fontSize="9" fontFamily="JetBrains Mono" fill="var(--accent-green)" opacity="0.6">−18° (ASTRO NIGHT)</text>
       {[0, 6, 12, 18, 24, 30, 36].map((h) => (
