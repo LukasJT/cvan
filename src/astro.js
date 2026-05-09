@@ -228,6 +228,90 @@ export function geomagneticToGeographic(magLatDeg, magLonDeg) {
   return { lat: lat * RAD, lon };
 }
 
+/* Geographic → geomagnetic (full rotation: returns both lat and lon). The
+   inverse of geomagneticToGeographic; built by transposing the same dipole
+   rotation matrix. Used to compute Magnetic Local Time of a point. */
+export function geographicToGeomagnetic(latDeg, lonDeg) {
+  const lat = latDeg * DEG;
+  const lon = lonDeg * DEG;
+  const pLat = GEOMAG_POLE.lat * DEG;
+  const pLon = GEOMAG_POLE.lon * DEG;
+  const gx = Math.cos(lat) * Math.cos(lon);
+  const gy = Math.cos(lat) * Math.sin(lon);
+  const gz = Math.sin(lat);
+  const A = -Math.sin(pLat) * Math.cos(pLon) * gx
+            - Math.sin(pLat) * Math.sin(pLon) * gy
+            + Math.cos(pLat) * gz;
+  const B = -Math.sin(pLon) * gx + Math.cos(pLon) * gy;
+  const C =  Math.cos(pLat) * Math.cos(pLon) * gx
+            + Math.cos(pLat) * Math.sin(pLon) * gy
+            + Math.sin(pLat) * gz;
+  const mLat = Math.asin(clamp(C, -1, 1)) * RAD;
+  const mLon = Math.atan2(B, A) * RAD;
+  return { lat: mLat, lon: ((mLon + 540) % 360) - 180 };
+}
+
+/* Subsolar geographic point at date — the point on Earth where the sun is
+   directly overhead. lat = solar declination; lon = -GHA_sun. */
+export function subsolarPoint(date) {
+  const jd = toJulian(date);
+  const sun = sunPosition(jd);
+  const gha = ((gmst(jd) - sun.ra) % 360 + 360) % 360;
+  const lon = ((-gha + 540) % 360) - 180;
+  return { lat: sun.dec, lon };
+}
+
+/* Auroral oval rings for a given Kp and instant. The oval is asymmetric in
+   Magnetic Local Time: dipped equatorward at magnetic midnight, narrower
+   at noon. Returns equatorward + poleward boundaries for both hemispheres
+   as arrays of { lat, lon, day } where `day` is true on the sunlit side
+   (aurora invisible). Resolution is one sample per 5° MLT. */
+export function auroralOvalRings(kp, date) {
+  const baseEq = KP_VIEW_LAT[Math.floor(clamp(kp, 0, 9))] ?? 50;
+  const sub = subsolarPoint(date);
+  const subMag = geographicToGeomagnetic(sub.lat, sub.lon);
+
+  const samples = [];
+  // MLT from 0 (magnetic midnight) to 24 in 5° magnetic-longitude steps
+  for (let dLon = -180; dLon <= 180; dLon += 5) {
+    // dLon is offset from subsolar magnetic longitude; magnetic noon is dLon=0,
+    // magnetic midnight is dLon=±180. MLT = 12 + dLon/15 (mod 24).
+    const mLon = ((subMag.lon + dLon + 540) % 360) - 180;
+    // Asymmetry term: 0 at noon (dLon=0), 1 at midnight (|dLon|=180).
+    const a = (1 - Math.cos(dLon * DEG)) / 2;
+    const eqLat = baseEq - 3 * a;             // equatorward dip
+    const poleLat = eqLat + 5 + 3 * a;        // wider on the nightside
+    samples.push({ mLon, eqLat, poleLat, midnightFraction: a });
+  }
+
+  const toGeo = (mLat, mLon) => geomagneticToGeographic(mLat, mLon);
+  // Day flag = subsolar angular distance < 90°
+  const dayFlag = (lat, lon) => {
+    const cosArc = Math.sin(lat * DEG) * Math.sin(sub.lat * DEG)
+                 + Math.cos(lat * DEG) * Math.cos(sub.lat * DEG) * Math.cos((lon - sub.lon) * DEG);
+    return cosArc > 0;
+  };
+
+  const build = (signLat) => {
+    const eq = [], pole = [];
+    for (const s of samples) {
+      const e = toGeo(signLat * s.eqLat, s.mLon);
+      const p = toGeo(signLat * s.poleLat, s.mLon);
+      eq.push({ lat: e.lat, lon: e.lon, day: dayFlag(e.lat, e.lon) });
+      pole.push({ lat: p.lat, lon: p.lon, day: dayFlag(p.lat, p.lon) });
+    }
+    return { eq, pole };
+  };
+
+  return {
+    north: build(+1),
+    south: build(-1),
+    subsolar: sub,
+    kp,
+    baseEq,
+  };
+}
+
 /* Open-Meteo returns hourly timestamps as "YYYY-MM-DDTHH:MM" with no TZ marker;
    they represent the LOCATION's local wall-clock (when fetched with timezone=auto).
    Parse them as a UTC instant by reversing the location's UTC offset. */

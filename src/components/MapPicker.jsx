@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
-import { KP_VIEW_LAT, geomagneticToGeographic, BORTLE } from "../astro.js";
+import React, { useEffect, useRef } from "react";
+import { auroralOvalRings, BORTLE } from "../astro.js";
+import { LP_TILE_BASE } from "../lightPollution.js";
 
 let leafletPromise = null;
 function loadLeaflet() {
@@ -23,7 +24,7 @@ function loadLeaflet() {
   return leafletPromise;
 }
 
-export function MapPanel({ coords, onPick, weather, aurora, bortleAuto, overlays, setOverlays }) {
+export function MapPanel({ coords, onPick, weather, aurora, bortleAuto, now, overlays, setOverlays }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
@@ -34,12 +35,20 @@ export function MapPanel({ coords, onPick, weather, aurora, bortleAuto, overlays
           Tiles © OpenStreetMap contributors
         </div>
       </div>
-      <MapPicker coords={coords} onPick={onPick} weather={weather} aurora={aurora} bortleAuto={bortleAuto} overlays={overlays} />
+      <MapPicker
+        coords={coords}
+        onPick={onPick}
+        weather={weather}
+        aurora={aurora}
+        bortleAuto={bortleAuto}
+        now={now}
+        overlays={overlays}
+      />
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <span className="mono text-xs uppercase tracking-widest muted">Overlays:</span>
         <OverlayCheck label="Cloud cover" id="clouds" overlays={overlays} setOverlays={setOverlays} />
         <OverlayCheck label="Auroral oval" id="auroralOval" overlays={overlays} setOverlays={setOverlays} />
-        <OverlayCheck label="Light pollution (Bortle)" id="lightPollution" overlays={overlays} setOverlays={setOverlays} />
+        <OverlayCheck label="Light pollution (Lorenz atlas)" id="lightPollution" overlays={overlays} setOverlays={setOverlays} />
       </div>
     </div>
   );
@@ -60,13 +69,14 @@ function OverlayCheck({ label, id, overlays, setOverlays }) {
   );
 }
 
-function MapPicker({ coords, onPick, weather, aurora, bortleAuto, overlays }) {
+function MapPicker({ coords, onPick, weather, aurora, bortleAuto, now, overlays }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const ovalLayerRef = useRef(null);
   const cloudLayerRef = useRef(null);
-  const lpLayerRef = useRef(null);
+  const lpTileLayerRef = useRef(null);
+  const lpMarkerLayerRef = useRef(null);
   const onPickRef = useRef(onPick);
   useEffect(() => { onPickRef.current = onPick; }, [onPick]);
 
@@ -115,7 +125,8 @@ function MapPicker({ coords, onPick, weather, aurora, bortleAuto, overlays }) {
         markerRef.current = null;
         ovalLayerRef.current = null;
         cloudLayerRef.current = null;
-        lpLayerRef.current = null;
+        lpTileLayerRef.current = null;
+        lpMarkerLayerRef.current = null;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,7 +139,10 @@ function MapPicker({ coords, onPick, weather, aurora, bortleAuto, overlays }) {
     }
   }, [coords.lat, coords.lon]);
 
-  // Auroral oval overlay (computed from current Kp)
+  /* Auroral oval — asymmetric oval centered on the geomagnetic pole, dipped
+     equatorward at magnetic midnight. Recomputed whenever Kp or `now`
+     changes. Each boundary is split into night-side (solid, bright) and
+     day-side (dashed, dim) segments since aurora is invisible in daylight. */
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !window.L) return;
@@ -136,32 +150,43 @@ function MapPicker({ coords, onPick, weather, aurora, bortleAuto, overlays }) {
       map.removeLayer(ovalLayerRef.current);
       ovalLayerRef.current = null;
     }
-    if (!overlays.auroralOval || !aurora) return;
+    if (!overlays.auroralOval || !aurora || !now) return;
     const L = window.L;
-    const kp = aurora.kp;
-    const threshold = KP_VIEW_LAT[Math.floor(kp)] ?? 50;
-    const ringN = [];
-    const ringS = [];
-    for (let mlon = 0; mlon <= 360; mlon += 5) {
-      const n = geomagneticToGeographic(threshold, mlon);
-      ringN.push([n.lat, n.lon]);
-      const s = geomagneticToGeographic(-threshold, mlon);
-      ringS.push([s.lat, s.lon]);
-    }
-    const opts = {
-      color: "#6dffb0",
-      weight: 2,
-      opacity: 0.85,
-      fillColor: "#6dffb0",
-      fillOpacity: 0.08,
-      noClip: true,
+    const rings = auroralOvalRings(aurora.kp, now);
+
+    const layers = [];
+    const drawHemisphere = (h, isNorth) => {
+      // Pair night-side and day-side rendering for both equatorward and
+      // poleward boundaries. Closed rings are split into runs of consecutive
+      // night/day samples and rendered as separate polylines.
+      [["eq", h.eq, isNorth ? "Equatorward edge" : "Equatorward edge (S)"],
+       ["pole", h.pole, isNorth ? "Poleward edge" : "Poleward edge (S)"]]
+        .forEach(([_kind, ring]) => {
+          const runs = splitRuns(ring);
+          for (const r of runs) {
+            const path = r.points.map((p) => [p.lat, p.lon]);
+            const opts = r.day
+              ? { color: "#6dffb0", weight: 1.2, opacity: 0.35, dashArray: "4 6", noClip: true }
+              : { color: "#6dffb0", weight: 2,   opacity: 0.95, noClip: true };
+            layers.push(L.polyline(path, opts));
+          }
+        });
+
+      // (No fill polygon — it wraps badly across the antimeridian for some
+      // subsolar geometries. The two boundary polylines already convey the
+      // oval band visually.)
     };
-    const layer = L.layerGroup([
-      L.polyline(ringN, opts),
-      L.polyline(ringS, opts),
-    ]).addTo(map);
-    ovalLayerRef.current = layer;
-  }, [overlays.auroralOval, aurora]);
+    drawHemisphere(rings.north, true);
+    drawHemisphere(rings.south, false);
+
+    const group = L.layerGroup(layers).addTo(map);
+    group.eachLayer((l) => {
+      if (l.bindTooltip) {
+        l.bindTooltip(`Auroral oval · Kp ${aurora.kp.toFixed(1)} · base ${rings.baseEq}° geomag`, { sticky: true });
+      }
+    });
+    ovalLayerRef.current = group;
+  }, [overlays.auroralOval, aurora, now]);
 
   // Cloud cover indicator at the user's location (current observation)
   useEffect(() => {
@@ -188,27 +213,52 @@ function MapPicker({ coords, onPick, weather, aurora, bortleAuto, overlays }) {
     cloudLayerRef.current = layer;
   }, [overlays.clouds, weather, coords.lat, coords.lon]);
 
-  // Light-pollution Bortle marker at the user's location
+  /* Light pollution: overlay the actual Lorenz atlas tiles on the map so
+     the entire viewport shows the per-pixel atlas. The tiles are 1024px
+     paletted PNGs at native zoom 6 (zoomOffset −2 makes leaflet treat them
+     as 4× larger so coverage matches a standard z=8 grid). A small
+     Bortle-colored marker on the user's location keeps the at-a-glance
+     "your sky here" indicator. */
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !window.L) return;
-    if (lpLayerRef.current) {
-      map.removeLayer(lpLayerRef.current);
-      lpLayerRef.current = null;
+    if (lpTileLayerRef.current) {
+      map.removeLayer(lpTileLayerRef.current);
+      lpTileLayerRef.current = null;
     }
-    if (!overlays.lightPollution || !bortleAuto) return;
+    if (lpMarkerLayerRef.current) {
+      map.removeLayer(lpMarkerLayerRef.current);
+      lpMarkerLayerRef.current = null;
+    }
+    if (!overlays.lightPollution) return;
     const L = window.L;
-    const info = BORTLE[bortleAuto.bortle - 1];
-    const layer = L.circle([coords.lat, coords.lon], {
-      radius: 25000,
-      color: info.color,
-      weight: 2,
-      opacity: 0.9,
-      fillColor: info.color,
-      fillOpacity: 0.45,
-    }).bindTooltip(`Bortle ${bortleAuto.bortle} · SQM ${bortleAuto.sqm.toFixed(2)}`, { permanent: false });
-    layer.addTo(map);
-    lpLayerRef.current = layer;
+    const tiles = L.tileLayer(`${LP_TILE_BASE}/tile_{z}_{x}_{y}.png`, {
+      minZoom: 2,
+      maxNativeZoom: 6,
+      maxZoom: 12,
+      tileSize: 1024,
+      zoomOffset: -2,
+      opacity: 0.55,
+      errorTileUrl: `${LP_TILE_BASE}/black.png`,
+    }).addTo(map);
+    lpTileLayerRef.current = tiles;
+
+    if (bortleAuto) {
+      const info = BORTLE[bortleAuto.bortle - 1];
+      const marker = L.circle([coords.lat, coords.lon], {
+        radius: 12000,
+        color: info.color,
+        weight: 2,
+        opacity: 1,
+        fillColor: info.color,
+        fillOpacity: 0.6,
+      }).bindTooltip(
+        `You · Bortle ${bortleAuto.bortle} · SQM ${bortleAuto.sqm.toFixed(2)} · zone ${bortleAuto.zone}`,
+        { permanent: false }
+      );
+      marker.addTo(map);
+      lpMarkerLayerRef.current = marker;
+    }
   }, [overlays.lightPollution, bortleAuto, coords.lat, coords.lon]);
 
   return (
@@ -224,4 +274,51 @@ function MapPicker({ coords, onPick, weather, aurora, bortleAuto, overlays }) {
       }}
     />
   );
+}
+
+/* Walk a closed ring of {day:bool} samples and emit consecutive runs of
+   identical day/night flag, with each run carrying one extra boundary
+   sample so adjacent runs visually meet. Also splits any run whose
+   consecutive samples span more than 180° of longitude (antimeridian
+   crossing) so Leaflet doesn't draw a horizontal line all the way across
+   the world. Returns an array of { day:bool, points:[…] }. */
+function splitRuns(ring) {
+  if (!ring.length) return [];
+  // Step 1 — split by day/night flag, joining each run with the boundary
+  // sample so adjacent runs visually meet.
+  const byFlag = [];
+  let cur = { day: ring[0].day, points: [ring[0]] };
+  for (let i = 1; i < ring.length; i++) {
+    if (ring[i].day === cur.day) {
+      cur.points.push(ring[i]);
+    } else {
+      cur.points.push(ring[i]);
+      byFlag.push(cur);
+      cur = { day: ring[i].day, points: [ring[i]] };
+    }
+  }
+  // Stitch the wrap-around: if first and last runs share day flag, merge.
+  if (byFlag.length && cur.day === byFlag[0].day) {
+    byFlag[0].points = [...cur.points, ...byFlag[0].points];
+  } else {
+    byFlag.push(cur);
+  }
+  // Step 2 — within each flag-run, split anywhere consecutive samples jump
+  // by more than 180° longitude (the polyline would otherwise wrap the map).
+  const out = [];
+  for (const run of byFlag) {
+    let chunk = [run.points[0]];
+    for (let i = 1; i < run.points.length; i++) {
+      const a = run.points[i - 1].lon;
+      const b = run.points[i].lon;
+      if (Math.abs(b - a) > 180) {
+        out.push({ day: run.day, points: chunk });
+        chunk = [run.points[i]];
+      } else {
+        chunk.push(run.points[i]);
+      }
+    }
+    if (chunk.length > 1) out.push({ day: run.day, points: chunk });
+  }
+  return out;
 }

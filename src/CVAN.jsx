@@ -334,6 +334,7 @@ export default function CVAN() {
                 weather={weather}
                 aurora={aurora}
                 bortleAuto={bortleAuto}
+                now={now}
                 overlays={mapOverlays}
                 setOverlays={setMapOverlays}
               />
