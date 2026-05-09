@@ -137,4 +137,11 @@ export const SOURCES = [
     url: "https://www.openstreetmap.org/copyright",
     used: "Base map tiles. Tile data © OSM contributors, ODbL.",
   },
+  {
+    id: "nasa-gibs",
+    title: "NASA Global Imagery Browse Services (GIBS) — VIIRS SNPP daily true-color imagery",
+    publisher: "NASA EOSDIS",
+    url: "https://nasa-gibs.github.io/gibs-api-docs/",
+    used: "Cloud-cover map overlay (latest near-real-time global satellite mosaic).",
+  },
 ];

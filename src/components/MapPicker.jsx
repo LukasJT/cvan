@@ -1,6 +1,19 @@
 import React, { useEffect, useRef } from "react";
-import { auroralOvalRings, BORTLE } from "../astro.js";
+import { auroralOvalRings, BORTLE, sunPosition, gmst, toJulian, DEG, RAD } from "../astro.js";
 import { LP_TILE_BASE } from "../lightPollution.js";
+
+/* Today's UTC date in YYYY-MM-DD form for NASA GIBS tile URLs. The VIIRS
+   SNPP true-color product is published in near-real-time but a brand new
+   day's tiles can be empty until the satellites pass; if today returns
+   404 leaflet's errorTileUrl falls back to yesterday automatically. */
+function gibsDate() {
+  const d = new Date();
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+function gibsDateOffset(deltaDays) {
+  const d = new Date(Date.now() + deltaDays * 86400000);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
 
 let leafletPromise = null;
 function loadLeaflet() {
@@ -46,7 +59,8 @@ export function MapPanel({ coords, onPick, weather, aurora, bortleAuto, now, ove
       />
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <span className="mono text-xs uppercase tracking-widest muted">Overlays:</span>
-        <OverlayCheck label="Cloud cover" id="clouds" overlays={overlays} setOverlays={setOverlays} />
+        <OverlayCheck label="Cloud cover (NASA VIIRS)" id="clouds" overlays={overlays} setOverlays={setOverlays} />
+        <OverlayCheck label="Day / night & twilight" id="daynight" overlays={overlays} setOverlays={setOverlays} />
         <OverlayCheck label="Auroral oval" id="auroralOval" overlays={overlays} setOverlays={setOverlays} />
         <OverlayCheck label="Light pollution (Lorenz atlas)" id="lightPollution" overlays={overlays} setOverlays={setOverlays} />
       </div>
@@ -75,6 +89,8 @@ function MapPicker({ coords, onPick, weather, aurora, bortleAuto, now, overlays 
   const markerRef = useRef(null);
   const ovalLayerRef = useRef(null);
   const cloudLayerRef = useRef(null);
+  const cloudMarkerRef = useRef(null);
+  const dayNightLayerRef = useRef(null);
   const lpTileLayerRef = useRef(null);
   const lpMarkerLayerRef = useRef(null);
   const onPickRef = useRef(onPick);
@@ -125,6 +141,8 @@ function MapPicker({ coords, onPick, weather, aurora, bortleAuto, now, overlays 
         markerRef.current = null;
         ovalLayerRef.current = null;
         cloudLayerRef.current = null;
+        cloudMarkerRef.current = null;
+        dayNightLayerRef.current = null;
         lpTileLayerRef.current = null;
         lpMarkerLayerRef.current = null;
       }
@@ -191,31 +209,72 @@ function MapPicker({ coords, onPick, weather, aurora, bortleAuto, now, overlays 
     ovalLayerRef.current = group;
   }, [overlays.auroralOval, aurora, now]);
 
-  // Cloud cover indicator at the user's location (current observation)
+  /* Cloud cover — overlay NASA GIBS VIIRS true-color tiles. Each daily
+     orbit pass produces a global mosaic showing actual clouds (bright
+     white) over land/ocean. The latest day's tiles can be sparse until
+     the satellite finishes its passes; errorTileUrl falls back to the
+     previous day's image where the current day isn't ready.
+     Plus: a small marker at the user's location showing the local
+     forecast cloud %, so the at-a-glance "your sky right now" reading
+     stays available. */
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !window.L) return;
-    if (cloudLayerRef.current) {
-      map.removeLayer(cloudLayerRef.current);
-      cloudLayerRef.current = null;
-    }
-    if (!overlays.clouds || !weather?.current) return;
-    const cc = weather.current.cloud_cover;
-    if (cc == null) return;
+    if (cloudLayerRef.current) { map.removeLayer(cloudLayerRef.current); cloudLayerRef.current = null; }
+    if (cloudMarkerRef.current) { map.removeLayer(cloudMarkerRef.current); cloudMarkerRef.current = null; }
+    if (!overlays.clouds) return;
     const L = window.L;
-    const color = cc > 80 ? "#5a6a85" : cc > 50 ? "#9aa5b8" : cc > 20 ? "#d4d4d4" : "#ffffff";
-    const layer = L.circle([coords.lat, coords.lon], {
-      radius: 80000,
-      color,
-      weight: 1,
-      opacity: 0.6,
-      fillColor: color,
-      fillOpacity: 0.25,
-      bubblingMouseEvents: false,
-    }).bindTooltip(`Current cloud cover: ${cc}%`, { permanent: false });
-    layer.addTo(map);
-    cloudLayerRef.current = layer;
+    const today = gibsDate();
+    const yesterday = gibsDateOffset(-1);
+    const tiles = L.tileLayer(
+      `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/${today}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
+      {
+        minZoom: 1,
+        maxNativeZoom: 9,
+        maxZoom: 12,
+        opacity: 0.6,
+        errorTileUrl: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/${yesterday}/GoogleMapsCompatible_Level9/3/2/4.jpg`,
+        attribution: `Imagery © NASA EOSDIS GIBS · VIIRS SNPP true color · ${today}`,
+      }
+    ).addTo(map);
+    cloudLayerRef.current = tiles;
+
+    // Forecast cloud % marker at user location (small dot, doesn't bubble).
+    const cc = weather?.current?.cloud_cover;
+    if (cc != null) {
+      const color = cc > 80 ? "#5a6a85" : cc > 50 ? "#9aa5b8" : cc > 20 ? "#d4d4d4" : "#ffffff";
+      const marker = L.circle([coords.lat, coords.lon], {
+        radius: 25000,
+        color,
+        weight: 2,
+        opacity: 0.95,
+        fillColor: color,
+        fillOpacity: 0.5,
+        bubblingMouseEvents: false,
+      }).bindTooltip(`Forecast cloud cover here: ${cc}%`, { permanent: false });
+      marker.addTo(map);
+      cloudMarkerRef.current = marker;
+    }
   }, [overlays.clouds, weather, coords.lat, coords.lon]);
+
+  /* Day/night & twilight bands. Custom L.GridLayer paints each tile with
+     a per-pixel sun-altitude shading: 4 thresholds (horizon, civil −6°,
+     nautical −12°, astronomical −18°) build up the recognizable
+     graduated terminator. Updated every time `now` changes (which is
+     once per minute from CVAN's app-level interval). */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !window.L) return;
+    if (dayNightLayerRef.current) {
+      map.removeLayer(dayNightLayerRef.current);
+      dayNightLayerRef.current = null;
+    }
+    if (!overlays.daynight || !now) return;
+    const L = window.L;
+    const layer = makeDayNightLayer(L, now);
+    layer.addTo(map);
+    dayNightLayerRef.current = layer;
+  }, [overlays.daynight, now]);
 
   /* Light pollution: overlay the actual Lorenz atlas tiles on the map so
      the entire viewport shows the per-pixel atlas. The tiles are 1024px
@@ -279,6 +338,74 @@ function MapPicker({ coords, onPick, weather, aurora, bortleAuto, now, overlays 
       }}
     />
   );
+}
+
+/* Day/night canvas tile layer. Builds an L.GridLayer subclass that
+   computes the sun's altitude per pixel and writes a translucent blue
+   to mark progressively darker twilight stages:
+     alt > 0°    → no shading (daytime)
+     0 to -6°    → civil twilight (alpha 0.18)
+     -6 to -12°  → nautical twilight (alpha 0.32)
+     -12 to -18° → astronomical twilight (alpha 0.45)
+     alt < -18°  → full astronomical night (alpha 0.55)
+   Performance: Web Mercator y → lat is the slow conversion; we cache
+   one row at a time so each pixel only does a couple of trig ops. */
+function makeDayNightLayer(L, date) {
+  const jd = toJulian(date);
+  const sun = sunPosition(jd);
+  const sunRA = sun.ra;
+  const sunDecRad = sun.dec * DEG;
+  const sinDec = Math.sin(sunDecRad);
+  const cosDec = Math.cos(sunDecRad);
+  const gmstDeg = gmst(jd);
+
+  const NightLayer = L.GridLayer.extend({
+    createTile(coords) {
+      const tile = document.createElement("canvas");
+      const size = this.getTileSize();
+      tile.width = size.x;
+      tile.height = size.y;
+      const ctx = tile.getContext("2d");
+      const img = ctx.createImageData(size.x, size.y);
+      const buf = img.data;
+
+      const n = 2 ** coords.z;
+      const tileWest = coords.x / n;
+      const tileNorth = coords.y / n;
+
+      for (let py = 0; py < size.y; py++) {
+        // Web-Mercator pixel y → latitude
+        const fy = tileNorth + py / (n * size.y);
+        const latRad = Math.atan(Math.sinh(Math.PI * (1 - 2 * fy)));
+        const sinLat = Math.sin(latRad);
+        const cosLat = Math.cos(latRad);
+        for (let px = 0; px < size.x; px++) {
+          const fx = tileWest + px / (n * size.x);
+          const lonDeg = fx * 360 - 180;
+          // Hour angle of the sun at this longitude.
+          const haDeg = ((gmstDeg + lonDeg - sunRA) % 360 + 540) % 360 - 180;
+          const haRad = haDeg * DEG;
+          const sinAlt = sinLat * sinDec + cosLat * cosDec * Math.cos(haRad);
+          const altDeg = Math.asin(Math.max(-1, Math.min(1, sinAlt))) * RAD;
+
+          let a = 0;
+          if (altDeg <= -18)      a = 140;
+          else if (altDeg <= -12) a = 115;
+          else if (altDeg <= -6)  a = 82;
+          else if (altDeg <= 0)   a = 46;
+
+          const i = (py * size.x + px) * 4;
+          buf[i]     = 12;   // dark navy R
+          buf[i + 1] = 22;   // G
+          buf[i + 2] = 60;   // B
+          buf[i + 3] = a;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      return tile;
+    },
+  });
+  return new NightLayer({ opacity: 1, zIndex: 350 });
 }
 
 /* Walk a closed ring of {day:bool} samples and emit consecutive runs of

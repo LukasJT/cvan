@@ -30,7 +30,7 @@ export function Sources() {
 
       <div className="panel corner p-6">
         <h2 className="display gold text-lg mb-3">Weather, Geocoding, Mapping</h2>
-        <SourceList ids={["open-meteo", "nominatim", "leaflet", "osm"]} />
+        <SourceList ids={["open-meteo", "nasa-gibs", "nominatim", "leaflet", "osm"]} />
       </div>
 
       <div className="panel corner p-6">
