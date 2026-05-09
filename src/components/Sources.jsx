@@ -25,7 +25,12 @@ export function Sources() {
 
       <div className="panel corner p-6">
         <h2 className="display gold text-lg mb-3">Aurora &amp; Geomagnetism</h2>
-        <SourceList ids={["swpc-kp", "swpc-kp-forecast", "swpc-ovation", "swpc-aurora-tutorial", "igrf13"]} />
+        <SourceList ids={["swpc-kp", "swpc-kp-forecast", "swpc-solar-wind", "swpc-ovation", "swpc-aurora-tutorial", "igrf13"]} />
+      </div>
+
+      <div className="panel corner p-6">
+        <h2 className="display gold text-lg mb-3">Solar Imagery &amp; Heliophysics</h2>
+        <SourceList ids={["swpc-suvi", "soho-lasco", "sdo-hmi", "wsa-enlil", "silso-sunspots"]} />
       </div>
 
       <div className="panel corner p-6">

@@ -16,6 +16,7 @@ import { MoonSun } from "./components/MoonSun.jsx";
 import { Planner } from "./components/Planner.jsx";
 import { KpForecast } from "./components/KpForecast.jsx";
 import { Sources } from "./components/Sources.jsx";
+import { Solar } from "./components/Solar.jsx";
 
 const WEATHER_HORIZON_DAYS = 16;
 const LOCATION_CACHE_KEY = "cvan-last-location";
@@ -44,6 +45,18 @@ export default function CVAN() {
   const [mapOpen, setMapOpen] = useState(false);
   const [mapOverlays, setMapOverlays] = useState({ clouds: false, auroralOval: false, lightPollution: false });
   const [theme, setTheme] = useState(() => loadTheme());
+  const contentRef = useRef(null);
+
+  // Switch tab + scroll the content area into view so the user can see
+  // that the click registered (especially helpful for "About & sources"
+  // and the FULL CITATIONS link, which are far from the new content).
+  const goToTab = (next) => {
+    setTab(next);
+    // Wait one frame so the new tab content mounts before scrolling.
+    requestAnimationFrame(() => {
+      contentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   // Apply theme on change
   useEffect(() => { applyTheme(theme); }, [theme]);
@@ -301,7 +314,7 @@ export default function CVAN() {
                 <SettingsCog
                   theme={theme}
                   setTheme={setTheme}
-                  onOpenInfo={() => setTab("sources")}
+                  onOpenInfo={() => goToTab("sources")}
                 />
                 <Insignia />
                 <div>
@@ -367,10 +380,11 @@ export default function CVAN() {
         )}
 
         {/* TABS */}
-        <TabNav tab={tab} setTab={setTab} />
+        <TabNav tab={tab} setTab={goToTab} />
 
         {/* CONTENT */}
-        {!coords && tab !== "sources" ? (
+        <div ref={contentRef} style={{ scrollMarginTop: "12px" }} />
+        {!coords && tab !== "sources" && tab !== "solar" ? (
           <div className="panel corner p-12 text-center">
             <div className="display gold text-lg mb-3">AWAITING POSITION FIX</div>
             <p className="body text-base secondary">
@@ -421,6 +435,7 @@ export default function CVAN() {
             {tab === "kpforecast" && coords && (
               <KpForecast kpForecast={kpForecast} coords={coords} />
             )}
+            {tab === "solar" && <Solar />}
             {tab === "constellations" && coords && (
               <Constellations
                 coords={coords}
@@ -444,7 +459,7 @@ export default function CVAN() {
           <div>POSITIONS · MEEUS ASTRONOMICAL ALGORITHMS · WEATHER · OPEN-METEO · AURORA · NOAA SWPC</div>
           <div className="mt-1">LIGHT POLLUTION · LORENZ VIIRS ATLAS · MOON SKY BRIGHTNESS · KRISCIUNAS-SCHAEFER (1991) · BORTLE SCALE · BORTLE (2001) · GEOMAG · IGRF-13 DIPOLE</div>
           <div className="mt-2">
-            <button className="ghost" onClick={() => setTab("sources")} style={{ padding: "0.25rem 0.6rem", fontSize: "0.65rem" }}>FULL CITATIONS →</button>
+            <button className="ghost" onClick={() => goToTab("sources")} style={{ padding: "0.25rem 0.6rem", fontSize: "0.65rem" }}>FULL CITATIONS →</button>
           </div>
         </footer>
       </div>
@@ -495,6 +510,7 @@ const PRIMARY_TABS = [
   ["overview", "Tonight"],
   ["milkyway", "Milky Way"],
   ["aurora", "Aurora"],
+  ["solar", "Solar"],
   ["constellations", "Constellations"],
   ["planner", "Planner"],
 ];
