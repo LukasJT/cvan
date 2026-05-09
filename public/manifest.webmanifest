@@ -1,0 +1,32 @@
+{
+  "name": "CVAN — Celestial Visibility Analysis Network",
+  "short_name": "CVAN",
+  "description": "Stargazing conditions, Milky Way and aurora forecasting from real astronomy and live data.",
+  "start_url": "/cvan/",
+  "scope": "/cvan/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#050914",
+  "theme_color": "#0d1b3d",
+  "icons": [
+    {
+      "src": "/cvan/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/cvan/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/cvan/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["weather", "utilities", "education"]
+}

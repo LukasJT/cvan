@@ -7,4 +7,69 @@ html, body, #root {
   padding: 0;
   min-height: 100vh;
   background: #02040a;
+  /* PWA full-bleed: pad for iOS notch/home-indicator. */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Larger touch targets on phones; native input range thumbs are tiny on
+   mobile by default. */
+@media (pointer: coarse), (max-width: 640px) {
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 26px;
+    background: transparent;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    background: var(--strip-bg, #1a1a1a);
+    height: 6px;
+    border-radius: 3px;
+  }
+  input[type="range"]::-moz-range-track {
+    background: var(--strip-bg, #1a1a1a);
+    height: 6px;
+    border-radius: 3px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--accent-gold, #d4b86a);
+    border: 2px solid var(--bg-base, #02040a);
+    margin-top: -10px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--accent-gold, #d4b86a);
+    border: 2px solid var(--bg-base, #02040a);
+  }
+  /* Make .ghost buttons reach the 44pt minimum touch target */
+  button.ghost,
+  button.tab-btn {
+    min-height: 44px;
+  }
+  input[type="text"],
+  input[type="time"],
+  input[type="search"],
+  input[type="number"],
+  select {
+    min-height: 40px;
+    font-size: 16px;  /* prevents iOS auto-zoom */
+  }
+  /* Map a touch larger and let users pinch-zoom freely */
+  .leaflet-container {
+    touch-action: pan-x pan-y !important;
+  }
+}
+
+/* Hide non-essential decoration on the smallest screens to keep the
+   layout breathing. */
+@media (max-width: 480px) {
+  .corner::before, .corner::after { display: none; }
 }

@@ -2,13 +2,37 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/cvan/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="CVAN — Celestial Visibility Analysis Network. Stargazing conditions, Milky Way and aurora forecasting using NOAA SWPC, NOAA VIIRS, and Open-Meteo." />
+    <meta name="theme-color" content="#0d1b3d" />
+
+    <!-- iOS / Android PWA -->
+    <link rel="manifest" href="/cvan/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/cvan/favicon.svg" />
+    <link rel="apple-touch-icon" href="/cvan/icon-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="CVAN" />
+
     <title>CVAN · Celestial Visibility Analysis Network</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // Register the service worker on production hosts only — keeps Vite
+      // dev (which has its own HMR + module graph) from being shadowed
+      // by a cached app shell.
+      if (
+        "serviceWorker" in navigator &&
+        location.hostname !== "localhost" &&
+        location.hostname !== "127.0.0.1"
+      ) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/cvan/sw.js").catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>
