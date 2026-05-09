@@ -360,8 +360,14 @@ function bestTargetWindow(curve) {
    Factor cutoffs:
    - Bortle:           1–2 EX | 3 GR | 4–5 GO | 6–7 FA | 8–9 PO
    - Moon (Δ-V mag):   <0.10 EX | <0.50 GR | <1.5 GO | <3.0 FA | else PO
-   - Window darkness:  ≥1h astro night & target>30° EX | ≥1h astro & >10° GR
-                       | nautical & >10° GO | any usable FA | none PO
+   - Window darkness:  altitude-centric — what's the target's PEAK altitude
+                       during astronomical-night-with-no-moon, and is there
+                       at least a usable amount of dark time? Two hours at
+                       50° is genuinely excellent; two hours at 12° just
+                       before the target sets is at best Fair.
+                       peak ≥50° & dark ≥1h EX | peak ≥35° & dark ≥1h GR
+                       peak ≥20° & dark ≥0.5h GO | peak ≥10° & dark ≥0.5h FA
+                       else PO
    - Cloud cover %:    <10 EX | <20 GR | <40 GO | <70 FA | else PO */
 function scoreFactors(window, curve, cloudAvg, bortle, cloudInRange) {
   const bortleTier = bortle <= 2 ? 4 : bortle <= 3 ? 3 : bortle <= 5 ? 2 : bortle <= 7 ? 1 : 0;
@@ -374,7 +380,6 @@ function scoreFactors(window, curve, cloudAvg, bortle, cloudInRange) {
       if (s.t >= window.bestStart && s.t <= window.bestEnd) { moonAvg += s.moonBrightness; moonN++; }
     }
   } else {
-    // Use astronomical-night samples for context even when window is null.
     for (const s of curve) {
       if (s.sunAlt < -18) { moonAvg += s.moonBrightness; moonN++; }
     }
@@ -382,22 +387,27 @@ function scoreFactors(window, curve, cloudAvg, bortle, cloudInRange) {
   moonAvg = moonN > 0 ? moonAvg / moonN : 0;
   const moonTier = moonAvg < 0.1 ? 4 : moonAvg < 0.5 ? 3 : moonAvg < 1.5 ? 2 : moonAvg < 3 ? 1 : 0;
 
-  // Window-darkness tier: how deep is the available night, and how high
-  // does the target climb during it?
-  let astroSamples = 0, nauticalSamples = 0, anyUsable = false;
+  // Window darkness — drive primarily by PEAK target altitude during the
+  // moon-down astro-night portion of the curve, with a minimum dark-hours
+  // floor so a momentary overhead transit doesn't single-handedly score
+  // Excellent. Hours below the target's peak get less weight than the
+  // peak itself: the duration check is just a "this isn't a 5-minute
+  // window" guard.
+  let astroSamples = 0;
+  let peakInDark = -90;
   for (const s of curve) {
-    if (s.sunAlt < -18 && s.moonAlt < MOON_NEGLIGIBLE_ALT_DEG && s.targetAlt > 10) astroSamples++;
-    if (s.sunAlt < -12 && s.moonAlt < MOON_NEGLIGIBLE_ALT_DEG && s.targetAlt > 10) nauticalSamples++;
-    if (s.sunAlt < -6  && s.targetAlt > 5) anyUsable = true;
+    if (s.sunAlt < -18 && s.moonAlt < MOON_NEGLIGIBLE_ALT_DEG) {
+      if (s.targetAlt > 0) astroSamples++;
+      if (s.targetAlt > peakInDark) peakInDark = s.targetAlt;
+    }
   }
-  const astroHours = astroSamples * 0.5; // sunCurve is half-hour samples
-  const nauticalHours = nauticalSamples * 0.5;
-  const peak = window?.peakCoreAlt ?? -90;
+  const astroHours = astroSamples * 0.5;
   let windowTier = 0;
-  if (astroHours >= 1 && peak > 30) windowTier = 4;
-  else if (astroHours >= 1 && peak > 10) windowTier = 3;
-  else if (nauticalHours >= 1 && peak > 10) windowTier = 2;
-  else if (window || anyUsable) windowTier = 1;
+  if      (peakInDark >= 50 && astroHours >= 1)   windowTier = 4;
+  else if (peakInDark >= 35 && astroHours >= 1)   windowTier = 3;
+  else if (peakInDark >= 20 && astroHours >= 0.5) windowTier = 2;
+  else if (peakInDark >= 10 && astroHours >= 0.5) windowTier = 1;
+  // else 0 (Poor) — target never climbs above 10° during dark sky.
 
   // Cloud cover (only if forecast is in range).
   let cloudTier = null;
@@ -409,10 +419,15 @@ function scoreFactors(window, curve, cloudAvg, bortle, cloudInRange) {
   if (cloudTier != null) tiers.push(cloudTier);
   const overall = Math.min(...tiers);
 
+  const windowDetail =
+    peakInDark < 0   ? "no dark window" :
+    astroHours < 0.5 ? `peak ${peakInDark.toFixed(0)}° · brief` :
+    `peak ${peakInDark.toFixed(0)}° · ${astroHours.toFixed(1)}h dark`;
+
   return {
     bortle: { verdict: verdictAt(bortleTier), detail: `Bortle ${bortle}` },
     moon:   { verdict: verdictAt(moonTier),   detail: `Δ-V ${moonAvg.toFixed(2)} mag` },
-    window: { verdict: verdictAt(windowTier), detail: astroHours >= 0.5 ? `${astroHours.toFixed(1)}h astro` : "no astro" },
+    window: { verdict: verdictAt(windowTier), detail: windowDetail },
     cloud:  cloudTier != null
       ? { verdict: verdictAt(cloudTier), detail: `${cloudAvg.toFixed(0)}%` }
       : { verdict: { tier: -1, key: "unknown", label: "Unknown", color: "var(--text-muted)" }, detail: "out of forecast" },
