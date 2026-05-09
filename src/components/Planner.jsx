@@ -362,11 +362,15 @@ function bestTargetWindow(curve) {
    - Moon (Δ-V mag):   <0.10 EX | <0.50 GR | <1.5 GO | <3.0 FA | else PO
    - Window darkness:  altitude-centric — what's the target's PEAK altitude
                        during astronomical-night-with-no-moon, and is there
-                       at least a usable amount of dark time? Two hours at
-                       50° is genuinely excellent; two hours at 12° just
-                       before the target sets is at best Fair.
-                       peak ≥50° & dark ≥1h EX | peak ≥35° & dark ≥1h GR
-                       peak ≥20° & dark ≥0.5h GO | peak ≥10° & dark ≥0.5h FA
+                       at least a usable amount of dark time? Tiers are
+                       calibrated so a target that culminates at a "decent"
+                       altitude for the user's latitude can still earn Good
+                       — e.g. the Galactic Core peaks at ~16° from southern
+                       Ontario and that's the BEST that latitude allows; it
+                       shouldn't be capped at Fair on an otherwise perfect
+                       night.
+                       peak ≥40° & dark ≥1h EX | peak ≥25° & dark ≥1h GR
+                       peak ≥15° & dark ≥0.5h GO | peak ≥5° & dark ≥0.5h FA
                        else PO
    - Cloud cover %:    <10 EX | <20 GR | <40 GO | <70 FA | else PO */
 function scoreFactors(window, curve, cloudAvg, bortle, cloudInRange) {
@@ -403,11 +407,11 @@ function scoreFactors(window, curve, cloudAvg, bortle, cloudInRange) {
   }
   const astroHours = astroSamples * 0.5;
   let windowTier = 0;
-  if      (peakInDark >= 50 && astroHours >= 1)   windowTier = 4;
-  else if (peakInDark >= 35 && astroHours >= 1)   windowTier = 3;
-  else if (peakInDark >= 20 && astroHours >= 0.5) windowTier = 2;
-  else if (peakInDark >= 10 && astroHours >= 0.5) windowTier = 1;
-  // else 0 (Poor) — target never climbs above 10° during dark sky.
+  if      (peakInDark >= 40 && astroHours >= 1)   windowTier = 4;
+  else if (peakInDark >= 25 && astroHours >= 1)   windowTier = 3;
+  else if (peakInDark >= 15 && astroHours >= 0.5) windowTier = 2;
+  else if (peakInDark >=  5 && astroHours >= 0.5) windowTier = 1;
+  // else 0 (Poor) — target never climbs above 5° during dark sky.
 
   // Cloud cover (only if forecast is in range).
   let cloudTier = null;
