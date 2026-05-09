@@ -200,15 +200,14 @@ function MilkyWayNightChart({ coords, now, tzName }) {
       <div className="mt-3 flex gap-4 mono text-xs flex-wrap secondary">
         <Legend color="var(--accent-warm)" label="Sun" />
         <Legend color="#e8e8e8" label="Moon" />
-        <Legend color="var(--accent-purple)" label="Milky Way Core (Sgr A*)" />
-        <Legend color="var(--accent-purple)" label="Milky Way band (Scorpius → Cassiopeia)" />
+        <Legend color="var(--accent-purple)" label="Milky Way Core (tick = band tilt in sky)" />
         <Legend color="var(--accent-green)" label="Astronomical night" dashed />
       </div>
       <div className="mono text-xs mt-2 subtle">
-        Faint purple curves trace the bright Milky Way band sampled at named landmarks
-        (Norma → Sagittarius → Aquila → Cygnus → Cassiopeia). The translucent envelope
-        shows the band's angular extent above the horizon at each moment — its tilt
-        across the chart reflects how the band is angled in the sky as it sweeps overhead.
+        The purple curve is the Galactic Core's altitude. The short tick mark at each hour
+        is angled to match how the Milky Way band is oriented in the sky at that moment —
+        nearly horizontal as it rises in the east, steepest as it transits south, then
+        flattening again toward the west.
       </div>
     </div>
   );

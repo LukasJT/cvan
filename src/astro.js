@@ -210,21 +210,15 @@ export function galacticToEquatorial(lDeg, bDeg) {
   return { ra, dec: Math.asin(clamp(ze, -1, 1)) * RAD };
 }
 
-/* Sample points along the bright Milky Way band (b=0). Galactic longitudes
-   chosen to span the most photogenic sweep: Scorpius "tail" (l=−45°)
-   through Sagittarius bulge (0°), the Aquila/Scutum cloud (+30°), the
-   Cygnus rift (+60°), and into Cassiopeia/Perseus (+105°). The label is
-   the famous landmark/constellation along that section. */
-export const MILKY_WAY_BAND_POINTS = [
-  { l: -60, label: "Norma / Carina" },
-  { l: -45, label: "Scorpius tail" },
-  { l: -25, label: "Sagittarius bulge" },
-  { l:   0, label: "Galactic Core (Sgr A*)" },
-  { l:  25, label: "Scutum cloud" },
-  { l:  50, label: "Aquila / Eagle" },
-  { l:  75, label: "Cygnus rift" },
-  { l: 105, label: "Cassiopeia" },
-].map((p) => ({ ...p, ...galacticToEquatorial(p.l, 0) }));
+/* Two points straddling the Galactic Core along galactic longitude. They
+   define a small chord on the Milky Way band whose endpoints, projected
+   into the observer's horizontal frame, give the local tilt of the
+   band at the core — used by the altitude chart to draw angled tick
+   marks (à la Travis Hance's milky-way-planner). */
+export const MILKY_WAY_BAND_TANGENT = {
+  before: galacticToEquatorial(-15, 0),
+  after:  galacticToEquatorial(+15, 0),
+};
 
 /* IGRF-13 geomagnetic north pole, epoch 2025 (NCEI). Drifts ~10 km/yr;
    the dipole approximation is good to ~3° magnetic latitude — adequate
@@ -429,10 +423,11 @@ export function azimuthName(az) {
 
 /* Compute a 36-hour altitude curve (sun, moon, MW core) at half-hour steps.
    `start` defaults to noon of `anchor` (so the night is centered in the
-   window). Each sample also carries a `bandAlt` array — altitudes of
-   the points listed in MILKY_WAY_BAND_POINTS — so a chart can render
-   the whole bright Milky Way band as a ribbon, not just a single core
-   point. The order of `bandAlt` matches MILKY_WAY_BAND_POINTS. */
+   window). Each sample also carries the MW band's local tilt at the
+   core: `coreAz` plus the (alt, az) of two points straddling the core
+   along the band — combined, those let the chart draw a small angled
+   tick mark at each time showing how the Milky Way is tilted in the
+   sky at that moment. */
 export function altitudeCurve(anchor, lat, lon) {
   const start = new Date(anchor);
   start.setHours(12, 0, 0, 0);
@@ -446,17 +441,24 @@ export function altitudeCurve(anchor, lat, lon) {
     const sunHz = equatorialToHorizontal(sun.ra, sun.dec, sidereal, lat);
     const moonHz = equatorialToHorizontal(moon.ra, moon.dec, sidereal, lat);
     const coreHz = equatorialToHorizontal(GALACTIC_CORE.ra, GALACTIC_CORE.dec, sidereal, lat);
-    const bandAlt = MILKY_WAY_BAND_POINTS.map((p) =>
-      equatorialToHorizontal(p.ra, p.dec, sidereal, lat).alt
-    );
+    const bBefore = MILKY_WAY_BAND_TANGENT.before;
+    const bAfter  = MILKY_WAY_BAND_TANGENT.after;
+    const tangBefore = equatorialToHorizontal(bBefore.ra, bBefore.dec, sidereal, lat);
+    const tangAfter  = equatorialToHorizontal(bAfter.ra,  bAfter.dec,  sidereal, lat);
     const phase = moonPhase(jd);
     const phaseAngle = Math.acos(2 * phase.illumination - 1) * RAD;
     samples.push({
       t, h,
       sunAlt: sunHz.alt,
+      sunAz: sunHz.az,
       moonAlt: moonHz.alt,
+      moonAz: moonHz.az,
       coreAlt: coreHz.alt,
-      bandAlt,
+      coreAz: coreHz.az,
+      bandTangent: {
+        beforeAlt: tangBefore.alt, beforeAz: tangBefore.az,
+        afterAlt:  tangAfter.alt,  afterAz:  tangAfter.az,
+      },
       moonIllum: phase.illumination,
       moonBrightness: moonSkyBrightness(moonHz.alt, phaseAngle),
     });

@@ -1,5 +1,5 @@
 import React from "react";
-import { fmtDeg, fmtTime, geomagneticLatitude, MILKY_WAY_BAND_POINTS } from "../astro.js";
+import { fmtDeg, fmtTime, geomagneticLatitude } from "../astro.js";
 import { DataCell, ScoreRow, Legend, VerdictCard, ScoreDial } from "./shared.jsx";
 import { milkyWayVerdict, auroraVerdict, deepSkyVerdict, auroraVerdictShort, cloudVerdict } from "../verdicts.js";
 import { moonPhaseName } from "../astro.js";
@@ -46,8 +46,7 @@ export function Overview({ sky, weather, aurora, bortle, score, curve, coords, w
         <div className="mt-3 flex gap-4 mono text-xs flex-wrap secondary">
           <Legend color="var(--accent-warm)" label="Sun" />
           <Legend color="#e8e8e8" label="Moon" />
-          <Legend color="var(--accent-purple)" label="Milky Way Core" />
-          <Legend color="var(--accent-purple)" label="Milky Way band (Scorpius → Cassiopeia)" />
+          <Legend color="var(--accent-purple)" label="Milky Way Core (tick = band tilt)" />
           <Legend color="var(--accent-green)" label="Astronomical night" dashed />
         </div>
       </div>
@@ -70,31 +69,40 @@ export function AltitudeChart({ curve }) {
   const linePath = (key) =>
     curve.map((s, i) => `${i === 0 ? "M" : "L"} ${xScale(s.h)} ${yScale(s[key])}`).join(" ");
 
-  /* Build a closed polygon for the bright Milky Way band envelope.
-     For each time sample we take the min/max of the band-point altitudes
-     (the curve's bandAlt array) — that gives the angular extent of the
-     band above/below the horizon at that moment. The polygon walks the
-     upper edge forward then the lower edge backward. Visually you see
-     the band swelling and tilting as it sweeps across the sky. */
-  const upper = curve.map((s) => Math.max(...(s.bandAlt ?? [s.coreAlt])));
-  const lower = curve.map((s) => Math.min(...(s.bandAlt ?? [s.coreAlt])));
-  const envelopePts = [
-    ...curve.map((s, i) => `${xScale(s.h)},${yScale(upper[i])}`),
-    ...[...curve].reverse().map((s, i) => {
-      const idx = curve.length - 1 - i;
-      return `${xScale(s.h)},${yScale(lower[idx])}`;
-    }),
-  ].join(" ");
-
-  /* Per-point lines for each named position along the band. The brighter
-     core stays bold; the rest are faint to suggest the band's reach. */
-  const bandPaths = (MILKY_WAY_BAND_POINTS ?? []).map((p, idx) => {
-    const isCore = p.l === 0;
-    const path = curve.map((s, i) => {
-      const v = s.bandAlt?.[idx];
-      return v == null ? "" : `${i === 0 ? "M" : "L"} ${xScale(s.h)} ${yScale(v)}`;
-    }).join(" ");
-    return { path, isCore, label: p.label };
+  /* Tilted "tick marks" showing the actual angle of the Milky Way band
+     in the sky at that moment (inspired by Travis Hance's milky-way-
+     planner). For each sampled time, project two points straddling the
+     core along the galactic longitude into the local horizontal frame;
+     the chord between them, scaled to a fixed pixel length and centred
+     on the core's position, draws the band's local tilt. Tick marks are
+     suppressed when the core is below the horizon. */
+  const TICK_PX = 18;
+  const TICK_EVERY = 2; // every other 30-min sample → one tick per hour
+  const ticks = [];
+  curve.forEach((s, i) => {
+    if (i % TICK_EVERY !== 0) return;
+    if (s.coreAlt < 0) return;
+    const t = s.bandTangent;
+    if (!t) return;
+    let dAz = t.afterAz - t.beforeAz;
+    if (dAz > 180) dAz -= 360;
+    if (dAz < -180) dAz += 360;
+    const dAlt = t.afterAlt - t.beforeAlt;
+    // azimuth grows clockwise from N; "right" on a south-facing chart is
+    // increasing azimuth, so a positive dAz tilts the screen-tick to
+    // the right. Vertical = altitude.
+    const len = Math.sqrt(dAz * dAz + dAlt * dAlt) || 1;
+    const ux = dAz / len;
+    const uy = -dAlt / len; // SVG y inverts altitude
+    const cx = xScale(s.h);
+    const cy = yScale(s.coreAlt);
+    ticks.push({
+      x1: cx - (TICK_PX / 2) * ux,
+      y1: cy - (TICK_PX / 2) * uy,
+      x2: cx + (TICK_PX / 2) * ux,
+      y2: cy + (TICK_PX / 2) * uy,
+      cx, cy,
+    });
   });
 
   const nightBands = [];
@@ -113,20 +121,18 @@ export function AltitudeChart({ curve }) {
       {nightBands.map(([a, b], i) => (
         <rect key={i} x={xScale(a)} y={P} width={xScale(b) - xScale(a)} height={H - P * 2} fill="rgba(109,255,176,0.06)" />
       ))}
-      {/* Milky Way band envelope (low alpha) — shows the angular extent */}
-      <polygon points={envelopePts} fill="var(--accent-purple)" opacity="0.10" />
-      {/* Per-point band lines (faint) */}
-      {bandPaths.map((b, i) => (
-        b.isCore ? null : (
-          <path key={i} d={b.path} fill="none" stroke="var(--accent-purple)" strokeWidth="0.8" opacity="0.45" />
-        )
-      ))}
       <line x1={P} y1={yScale(0)} x2={W - P} y2={yScale(0)} stroke="var(--accent-gold)" strokeWidth="1" strokeDasharray="2 4" opacity="0.5" />
       <line x1={P} y1={yScale(-18)} x2={W - P} y2={yScale(-18)} stroke="var(--accent-green)" strokeWidth="0.5" strokeDasharray="2 4" opacity="0.3" />
       <path d={linePath("sunAlt")} fill="none" stroke="var(--accent-warm)" strokeWidth="1.5" />
       <path d={linePath("moonAlt")} fill="none" stroke="#e8e8e8" strokeWidth="1.5" />
-      {/* Core line drawn on top, bold */}
-      <path d={linePath("coreAlt")} fill="none" stroke="var(--accent-purple)" strokeWidth="2" />
+      <path d={linePath("coreAlt")} fill="none" stroke="var(--accent-purple)" strokeWidth="1.5" opacity="0.45" />
+      {/* Angled MW tick marks at hourly intervals */}
+      {ticks.map((tk, i) => (
+        <g key={i}>
+          <line x1={tk.x1} y1={tk.y1} x2={tk.x2} y2={tk.y2} stroke="var(--accent-purple)" strokeWidth="2.4" strokeLinecap="round" />
+          <circle cx={tk.cx} cy={tk.cy} r="1.6" fill="var(--accent-purple)" />
+        </g>
+      ))}
       <text x={P} y={yScale(0) - 4} fontSize="9" fontFamily="JetBrains Mono" fill="var(--accent-gold)" opacity="0.7">HORIZON</text>
       <text x={P} y={yScale(-18) - 4} fontSize="9" fontFamily="JetBrains Mono" fill="var(--accent-green)" opacity="0.6">−18° (ASTRO NIGHT)</text>
       {[0, 6, 12, 18, 24, 30, 36].map((h) => (
