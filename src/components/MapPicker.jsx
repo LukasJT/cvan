@@ -165,9 +165,12 @@ function MapPicker({ coords, onPick, weather, aurora, bortleAuto, now, overlays 
           const runs = splitRuns(ring);
           for (const r of runs) {
             const path = r.points.map((p) => [p.lat, p.lon]);
+            // bubblingMouseEvents: false stops a click on the polyline from
+            // also firing the map's click handler, which would otherwise
+            // teleport the user marker to wherever the oval was clicked.
             const opts = r.day
-              ? { color: "#6dffb0", weight: 1.2, opacity: 0.35, dashArray: "4 6", noClip: true }
-              : { color: "#6dffb0", weight: 2,   opacity: 0.95, noClip: true };
+              ? { color: "#6dffb0", weight: 1.2, opacity: 0.35, dashArray: "4 6", noClip: true, bubblingMouseEvents: false }
+              : { color: "#6dffb0", weight: 2,   opacity: 0.95, noClip: true, bubblingMouseEvents: false };
             layers.push(L.polyline(path, opts));
           }
         });
@@ -208,6 +211,7 @@ function MapPicker({ coords, onPick, weather, aurora, bortleAuto, now, overlays 
       opacity: 0.6,
       fillColor: color,
       fillOpacity: 0.25,
+      bubblingMouseEvents: false,
     }).bindTooltip(`Current cloud cover: ${cc}%`, { permanent: false });
     layer.addTo(map);
     cloudLayerRef.current = layer;
@@ -252,6 +256,7 @@ function MapPicker({ coords, onPick, weather, aurora, bortleAuto, now, overlays 
         opacity: 1,
         fillColor: info.color,
         fillOpacity: 0.6,
+        bubblingMouseEvents: false,
       }).bindTooltip(
         `You · Bortle ${bortleAuto.bortle} · SQM ${bortleAuto.sqm.toFixed(2)} · zone ${bortleAuto.zone}`,
         { permanent: false }
