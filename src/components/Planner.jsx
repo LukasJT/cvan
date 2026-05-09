@@ -4,7 +4,7 @@ import {
   CONSTELLATIONS, GALACTIC_CORE, equatorialToHorizontal, lst,
   MOON_NEGLIGIBLE_ALT_DEG, parseLocationTime, dateAtLocationWallClock,
 } from "../astro.js";
-import { OutOfRangeNotice, ScoreDial } from "./shared.jsx";
+import { OutOfRangeNotice } from "./shared.jsx";
 
 const TARGETS = [
   { key: "core", label: "Milky Way Core (Sgr A*)", ra: GALACTIC_CORE.ra, dec: GALACTIC_CORE.dec },
@@ -13,8 +13,21 @@ const TARGETS = [
 
 const WEATHER_HORIZON_DAYS = 16;
 
+/* Five-tier verdict, shared by day cards and the detail panel.
+   `tier` is an integer 0..4 (poor → excellent) so we can take the MIN
+   across factor verdicts. */
+const VERDICTS = [
+  { tier: 0, key: "poor",      label: "Poor",      color: "var(--error)" },
+  { tier: 1, key: "fair",      label: "Fair",      color: "var(--warning)" },
+  { tier: 2, key: "good",      label: "Good",      color: "var(--accent-gold)" },
+  { tier: 3, key: "great",     label: "Great",     color: "var(--accent-green)" },
+  { tier: 4, key: "excellent", label: "Excellent", color: "var(--accent-purple)" },
+];
+const verdictAt = (tier) => VERDICTS[Math.max(0, Math.min(4, tier))];
+
 export function Planner({ coords, weather, weatherStale, bortle }) {
   const [days, setDays] = useState(30);
+  const [pageOffset, setPageOffset] = useState(0); // in days, applied to today's anchor
   const [target, setTarget] = useState("core");
   const [expanded, setExpanded] = useState(null);
 
@@ -27,29 +40,35 @@ export function Planner({ coords, weather, weatherStale, bortle }) {
     const todayAnchor = dateAtLocationWallClock(new Date(), tzOffsetSec, 12, 0);
     const cloudByHour = buildCloudLookup(weather, tzOffsetSec);
     for (let i = 0; i < days; i++) {
-      const anchor = new Date(todayAnchor.getTime() + i * 86400000);
+      const dayIndex = pageOffset + i;
+      const anchor = new Date(todayAnchor.getTime() + dayIndex * 86400000);
       const sunCurve = altitudeCurve(anchor, coords.lat, coords.lon);
       const targetCurve = computeTargetCurve(anchor, coords.lat, coords.lon, tgt.ra, tgt.dec);
       const merged = sunCurve.map((s, j) => ({ ...s, targetAlt: targetCurve[j].alt }));
       const window = bestTargetWindow(merged);
       const cloudAvg = window ? avgCloud(cloudByHour, window.bestStart, window.bestEnd) : null;
-      const score = window ? scoreWindow(window, merged, cloudAvg, bortle ?? 4) : 0;
-      const inForecast = i < WEATHER_HORIZON_DAYS;
+      const inForecast = dayIndex < WEATHER_HORIZON_DAYS;
+      const factors = scoreFactors(window, merged, inForecast ? cloudAvg : null, bortle ?? 4, inForecast);
       out.push({
         date: anchor,
         window,
         cloudAvg: inForecast ? cloudAvg : null,
         cloudInRange: inForecast,
-        score,
+        factors,
+        verdict: verdictAt(factors.overall),
         sunCurve: merged,
         moonIllum: merged[24]?.moonIllum ?? 0,  // ≈ midnight
         moonFrac: moonPhase(toJulian(anchor)).phaseFraction,
       });
     }
     return out;
-  }, [days, target, coords.lat, coords.lon, weather, bortle, tgt.ra, tgt.dec, tzOffsetSec]);
+  }, [days, pageOffset, target, coords.lat, coords.lon, weather, bortle, tgt.ra, tgt.dec, tzOffsetSec]);
 
   const expandedDay = expanded != null ? grid[expanded] : null;
+  const firstDate = grid[0]?.date;
+  const lastDate = grid[grid.length - 1]?.date;
+  const fmtRange = (d) => d ? d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : "";
+  const anyOutOfForecast = grid.some((g) => !g.cloudInRange);
 
   return (
     <div className="space-y-6">
@@ -62,22 +81,61 @@ export function Planner({ coords, weather, weatherStale, bortle }) {
             </select>
           </div>
           <div>
-            <div className="mono text-xs uppercase tracking-widest mb-1 muted">Range</div>
-            <select value={days} onChange={(e) => setDays(parseInt(e.target.value))}>
+            <div className="mono text-xs uppercase tracking-widest mb-1 muted">Page size</div>
+            <select
+              value={days}
+              onChange={(e) => { setDays(parseInt(e.target.value)); setPageOffset(0); setExpanded(null); }}
+            >
+              <option value={7}>7 days (within forecast)</option>
               <option value={14}>14 days (within forecast)</option>
               <option value={30}>30 days</option>
               <option value={90}>90 days</option>
-              <option value={180}>180 days</option>
-              <option value={365}>1 year</option>
             </select>
           </div>
           <div className="mono text-xs secondary" style={{ flex: 1 }}>
-            Showing best viewing window per night for {tgt.label}.
-            Score factors: target altitude during night, moonlight (Krisciunas-Schaefer), Bortle, cloud cover (Open-Meteo, when in range).
+            Each day rates Excellent / Great / Good / Fair / Poor based on Bortle,
+            moonlight in the window, twilight, and cloud cover (when in forecast).
+            Best viewing window per night for {tgt.label}.
           </div>
         </div>
 
-        {days > WEATHER_HORIZON_DAYS && <OutOfRangeNotice what="Cloud cover" horizon={`${WEATHER_HORIZON_DAYS} days`} />}
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <button
+              className="ghost"
+              onClick={() => { setPageOffset(Math.max(0, pageOffset - days)); setExpanded(null); }}
+              disabled={pageOffset === 0}
+              style={{ opacity: pageOffset === 0 ? 0.4 : 1, padding: "0.3rem 0.7rem" }}
+              title="Previous page"
+            >
+              ← {days}d
+            </button>
+            <span className="mono text-xs gold">
+              {fmtRange(firstDate)} → {fmtRange(lastDate)}
+            </span>
+            <button
+              className="ghost"
+              onClick={() => { setPageOffset(pageOffset + days); setExpanded(null); }}
+              style={{ padding: "0.3rem 0.7rem" }}
+              title="Next page"
+            >
+              {days}d →
+            </button>
+          </div>
+          {pageOffset > 0 && (
+            <button
+              className="ghost"
+              onClick={() => { setPageOffset(0); setExpanded(null); }}
+              style={{ padding: "0.3rem 0.7rem", fontSize: "0.7rem" }}
+            >
+              ⟲ TODAY
+            </button>
+          )}
+        </div>
+
+        {anyOutOfForecast && (
+          <OutOfRangeNotice what="Cloud cover" horizon={`${WEATHER_HORIZON_DAYS} days from today`} />
+        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-2 mt-4">
           {grid.map((d, i) => (
@@ -92,18 +150,13 @@ export function Planner({ coords, weather, weatherStale, bortle }) {
       </div>
 
       {expandedDay && (
-        <DayDetail day={expandedDay} target={tgt} bortle={bortle ?? 4} weather={weather} />
+        <DayDetail day={expandedDay} target={tgt} weather={weather} />
       )}
     </div>
   );
 }
 
 function DayCard({ day, isExpanded, onClick }) {
-  const scoreColor =
-    day.score > 70 ? "var(--accent-green)" :
-    day.score > 40 ? "var(--accent-gold)" :
-    day.score > 15 ? "var(--warning)" :
-    "var(--error)";
   return (
     <button
       onClick={onClick}
@@ -118,7 +171,9 @@ function DayCard({ day, isExpanded, onClick }) {
       <div className="display gold text-xs">
         {day.date.toLocaleDateString([], { month: "short", day: "numeric", weekday: "short" })}
       </div>
-      <div className="mono text-base mt-1" style={{ color: scoreColor }}>{day.score}</div>
+      <div className="display text-base mt-1" style={{ color: day.verdict.color, letterSpacing: "0.05em" }}>
+        {day.verdict.label}
+      </div>
       <div className="mono text-xs muted">
         {day.window ? `${fmtTime(day.window.bestStart)}–${fmtTime(day.window.bestEnd)}` : "no window"}
       </div>
@@ -130,9 +185,10 @@ function DayCard({ day, isExpanded, onClick }) {
   );
 }
 
-function DayDetail({ day, target, bortle, weather }) {
+function DayDetail({ day, target, weather }) {
   const tzOffsetSec = weather?.utc_offset_seconds ?? 0;
   const cloudByHour = useMemo(() => buildCloudLookup(weather, tzOffsetSec), [weather, tzOffsetSec]);
+  const f = day.factors;
   return (
     <div className="panel corner p-6">
       <div className="mono text-xs uppercase tracking-widest mb-3 muted">
@@ -140,7 +196,18 @@ function DayDetail({ day, target, bortle, weather }) {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div>
-          <ScoreDial score={day.score} label={`/ 100 · ${day.score > 70 ? "EXCELLENT" : day.score > 40 ? "GOOD" : day.score > 15 ? "POOR" : "BAD"}`} />
+          <div className="frame p-4 text-center" style={{ borderColor: day.verdict.color }}>
+            <div className="display text-3xl" style={{ color: day.verdict.color, letterSpacing: "0.1em" }}>
+              {day.verdict.label.toUpperCase()}
+            </div>
+            <div className="mono text-xs muted mt-1">overall verdict</div>
+          </div>
+          <div className="mt-4 space-y-1 mono text-xs">
+            <FactorPill label="Light pollution" v={f.bortle} />
+            <FactorPill label="Moon during window" v={f.moon} />
+            <FactorPill label="Window darkness" v={f.window} />
+            <FactorPill label="Cloud cover" v={f.cloud} />
+          </div>
           <div className="mt-3 body text-sm secondary">
             Moon: {moonPhaseName(day.moonFrac)} ({(day.moonIllum * 100).toFixed(0)}% illuminated)
           </div>
@@ -159,6 +226,19 @@ function DayDetail({ day, target, bortle, weather }) {
           <DayCurveChart curve={day.sunCurve} cloudByHour={cloudByHour} cloudInRange={day.cloudInRange} />
         </div>
       </div>
+    </div>
+  );
+}
+
+function FactorPill({ label, v }) {
+  if (!v) return null;
+  return (
+    <div className="flex items-center gap-2">
+      <span className="pill mono" style={{ background: v.verdict.color, color: "var(--bg-base)", minWidth: 70, textAlign: "center" }}>
+        {v.verdict.label.toUpperCase()}
+      </span>
+      <span className="muted">{label}</span>
+      <span className="subtle" style={{ marginLeft: "auto" }}>{v.detail}</span>
     </div>
   );
 }
@@ -273,23 +353,71 @@ function bestTargetWindow(curve) {
   return s ? { bestStart: s, bestEnd: e, peakCoreAlt: peakAlt, peakTime: peakT } : null;
 }
 
-function scoreWindow(window, curve, cloudAvg, bortle) {
-  if (!window) return 0;
-  let score = 100;
-  // altitude — peak altitude maps to (0..1)
-  score *= Math.max(0.2, Math.min(1, window.peakCoreAlt / 60));
-  // moon brightness: average over the window
-  let moonAvg = 0, n = 0;
-  for (const s of curve) {
-    if (s.t >= window.bestStart && s.t <= window.bestEnd) { moonAvg += s.moonBrightness; n++; }
+/* Five-tier verdict per factor. The day's overall verdict is the worst
+   (lowest) tier across all four factors. If a factor isn't measurable
+   (cloud cover beyond the 16-day forecast) it's omitted from the min.
+
+   Factor cutoffs:
+   - Bortle:           1–2 EX | 3 GR | 4–5 GO | 6–7 FA | 8–9 PO
+   - Moon (Δ-V mag):   <0.10 EX | <0.50 GR | <1.5 GO | <3.0 FA | else PO
+   - Window darkness:  ≥1h astro night & target>30° EX | ≥1h astro & >10° GR
+                       | nautical & >10° GO | any usable FA | none PO
+   - Cloud cover %:    <10 EX | <20 GR | <40 GO | <70 FA | else PO */
+function scoreFactors(window, curve, cloudAvg, bortle, cloudInRange) {
+  const bortleTier = bortle <= 2 ? 4 : bortle <= 3 ? 3 : bortle <= 5 ? 2 : bortle <= 7 ? 1 : 0;
+
+  // Moon brightness averaged over the viewing window (or whole astro night
+  // if no window), expressed as δ-V at zenith.
+  let moonAvg = 0, moonN = 0;
+  if (window) {
+    for (const s of curve) {
+      if (s.t >= window.bestStart && s.t <= window.bestEnd) { moonAvg += s.moonBrightness; moonN++; }
+    }
+  } else {
+    // Use astronomical-night samples for context even when window is null.
+    for (const s of curve) {
+      if (s.sunAlt < -18) { moonAvg += s.moonBrightness; moonN++; }
+    }
   }
-  moonAvg = n > 0 ? moonAvg / n : 0;
-  score -= moonAvg * 12;
-  // bortle
-  score -= (bortle - 1) * 6;
-  // cloud cover (if available)
-  if (cloudAvg != null) score -= cloudAvg * 0.4;
-  return Math.max(0, Math.min(100, Math.round(score)));
+  moonAvg = moonN > 0 ? moonAvg / moonN : 0;
+  const moonTier = moonAvg < 0.1 ? 4 : moonAvg < 0.5 ? 3 : moonAvg < 1.5 ? 2 : moonAvg < 3 ? 1 : 0;
+
+  // Window-darkness tier: how deep is the available night, and how high
+  // does the target climb during it?
+  let astroSamples = 0, nauticalSamples = 0, anyUsable = false;
+  for (const s of curve) {
+    if (s.sunAlt < -18 && s.moonAlt < MOON_NEGLIGIBLE_ALT_DEG && s.targetAlt > 10) astroSamples++;
+    if (s.sunAlt < -12 && s.moonAlt < MOON_NEGLIGIBLE_ALT_DEG && s.targetAlt > 10) nauticalSamples++;
+    if (s.sunAlt < -6  && s.targetAlt > 5) anyUsable = true;
+  }
+  const astroHours = astroSamples * 0.5; // sunCurve is half-hour samples
+  const nauticalHours = nauticalSamples * 0.5;
+  const peak = window?.peakCoreAlt ?? -90;
+  let windowTier = 0;
+  if (astroHours >= 1 && peak > 30) windowTier = 4;
+  else if (astroHours >= 1 && peak > 10) windowTier = 3;
+  else if (nauticalHours >= 1 && peak > 10) windowTier = 2;
+  else if (window || anyUsable) windowTier = 1;
+
+  // Cloud cover (only if forecast is in range).
+  let cloudTier = null;
+  if (cloudInRange && cloudAvg != null) {
+    cloudTier = cloudAvg < 10 ? 4 : cloudAvg < 20 ? 3 : cloudAvg < 40 ? 2 : cloudAvg < 70 ? 1 : 0;
+  }
+
+  const tiers = [bortleTier, moonTier, windowTier];
+  if (cloudTier != null) tiers.push(cloudTier);
+  const overall = Math.min(...tiers);
+
+  return {
+    bortle: { verdict: verdictAt(bortleTier), detail: `Bortle ${bortle}` },
+    moon:   { verdict: verdictAt(moonTier),   detail: `Δ-V ${moonAvg.toFixed(2)} mag` },
+    window: { verdict: verdictAt(windowTier), detail: astroHours >= 0.5 ? `${astroHours.toFixed(1)}h astro` : "no astro" },
+    cloud:  cloudTier != null
+      ? { verdict: verdictAt(cloudTier), detail: `${cloudAvg.toFixed(0)}%` }
+      : { verdict: { tier: -1, key: "unknown", label: "Unknown", color: "var(--text-muted)" }, detail: "out of forecast" },
+    overall,
+  };
 }
 
 function computeTargetCurve(anchor, lat, lon, ra, dec) {
