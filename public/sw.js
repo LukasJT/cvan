@@ -1,14 +1,19 @@
-/* CVAN service worker — minimal app-shell + runtime cache.
-   Live data (NOAA SWPC, Open-Meteo, NASA GIBS, Lorenz tiles) goes
-   network-first so we never serve stale Kp / weather. The bundled JS,
-   CSS, fonts, OSM tiles, and Leaflet CDN files use cache-first so the
-   shell paints fast and works briefly offline. */
-const CACHE = "cvan-shell-v1";
+/* CVAN service worker.
+   - The HTML shell uses NETWORK-FIRST so new deploys are picked up
+     the next time you're online (the previous v1 was cache-first on
+     the shell, which trapped users on stale builds — fixed in v2).
+   - /assets/* are Vite's hashed bundle filenames; they're immutable
+     so we cache them forever (cache-first).
+   - Live data (NOAA SWPC, Open-Meteo, NASA GIBS, Lorenz tiles, GIBS
+     image tiles, Nominatim) is network-first, fall back to cache only
+     if offline — we never want to serve a stale Kp / weather reading.
+   - Big static deps from CDNs (OSM tiles, leaflet, fonts) cache-first. */
+const CACHE = "cvan-shell-v2";
 const SHELL = [
-  "/cvan/",
-  "/cvan/index.html",
   "/cvan/favicon.svg",
   "/cvan/manifest.webmanifest",
+  "/cvan/icon-192.png",
+  "/cvan/icon-512.png",
 ];
 
 const LIVE_HOSTS = [
@@ -26,8 +31,11 @@ const CACHEABLE_HOSTS = [
 ];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())
+  );
 });
+
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys().then((keys) =>
@@ -40,19 +48,25 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET") return;
 
-  // Live data: network-first with a short fallback to cache.
+  // Live data: network-first.
   if (LIVE_HOSTS.some((h) => url.hostname === h || url.hostname.endsWith("." + h))) {
     e.respondWith(networkFirst(e.request));
     return;
   }
-  // Big static deps (tiles, fonts, leaflet bundle): cache-first.
+  // Big static CDN deps: cache-first.
   if (CACHEABLE_HOSTS.some((h) => url.hostname === h || url.hostname.endsWith("." + h))) {
     e.respondWith(cacheFirst(e.request));
     return;
   }
-  // Same-origin shell + bundle.
+  // Same-origin: hashed assets are immutable, everything else
+  // (notably index.html) must come from the network so new deploys
+  // are picked up on the next refresh.
   if (url.origin === location.origin) {
-    e.respondWith(cacheFirst(e.request));
+    if (url.pathname.includes("/assets/")) {
+      e.respondWith(cacheFirst(e.request));
+    } else {
+      e.respondWith(networkFirst(e.request));
+    }
   }
 });
 
