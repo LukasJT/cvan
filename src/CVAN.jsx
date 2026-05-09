@@ -189,27 +189,33 @@ export default function CVAN() {
     fetchViirs(coords.lat, coords.lon);
   }, [coords]);
 
-  /* 24h refresh — weather + VIIRS */
+  /* Refresh cadences — picked per data source's actual update frequency.
+     Open-Meteo current weather refreshes hourly; SWPC's 1-minute Kp feed
+     genuinely updates each minute; the 3-day forecast refreshes every
+     few hours but polling every 15 min is cheap and keeps the spark
+     chart current; the LP atlas is a yearly product so once-per-day is
+     plenty. */
   useEffect(() => {
     if (!coords) return;
-    const id = setInterval(() => {
-      fetchWeather(coords.lat, coords.lon);
-      fetchViirs(coords.lat, coords.lon);
-    }, 24 * 60 * 60 * 1000);
+    const id = setInterval(() => fetchWeather(coords.lat, coords.lon), 60 * 60 * 1000);
     return () => clearInterval(id);
   }, [coords]);
 
-  /* 5min refresh — aurora Kp current */
   useEffect(() => {
     if (!coords) return;
-    const id = setInterval(fetchAurora, 5 * 60 * 1000);
+    const id = setInterval(() => fetchViirs(coords.lat, coords.lon), 24 * 60 * 60 * 1000);
     return () => clearInterval(id);
   }, [coords]);
 
-  /* 30min refresh — Kp 3-day forecast */
   useEffect(() => {
     if (!coords) return;
-    const id = setInterval(fetchKpForecast, 30 * 60 * 1000);
+    const id = setInterval(fetchAurora, 60 * 1000);
+    return () => clearInterval(id);
+  }, [coords]);
+
+  useEffect(() => {
+    if (!coords) return;
+    const id = setInterval(fetchKpForecast, 15 * 60 * 1000);
     return () => clearInterval(id);
   }, [coords]);
 
@@ -292,7 +298,11 @@ export default function CVAN() {
           <div className="flex items-start justify-between gap-6 flex-wrap">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <SettingsCog theme={theme} setTheme={setTheme} />
+                <SettingsCog
+                  theme={theme}
+                  setTheme={setTheme}
+                  onOpenInfo={() => setTab("sources")}
+                />
                 <Insignia />
                 <div>
                   <h1 className="display text-3xl gold leading-none">CVAN</h1>
@@ -357,27 +367,7 @@ export default function CVAN() {
         )}
 
         {/* TABS */}
-        <nav className="flex gap-1 mt-8 mb-6 border-b flex-wrap" style={{ borderColor: "var(--panel-border)" }}>
-          {[
-            ["overview", "Tonight"],
-            ["milkyway", "Milky Way"],
-            ["aurora", "Aurora"],
-            ["kpforecast", "Kp Forecast"],
-            ["constellations", "Constellations"],
-            ["moonsun", "Moon & Sun"],
-            ["planner", "Planner"],
-            ["sources", "Sources"],
-          ].map(([k, label]) => (
-            <button
-              key={k}
-              className={`tab-btn display ${tab === k ? "active" : ""}`}
-              style={{ color: tab === k ? "var(--accent-gold)" : "var(--text-muted)" }}
-              onClick={() => setTab(k)}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
+        <TabNav tab={tab} setTab={setTab} />
 
         {/* CONTENT */}
         {!coords && tab !== "sources" ? (
@@ -491,6 +481,107 @@ function DataStatusStrip({ lastUpdated, now, onRefresh }) {
         ⟳ REFRESH NOW
       </button>
     </div>
+  );
+}
+
+/* Top tab nav. Primary tabs sit on the left; "Details ▾" on the right
+   opens a popover containing the deeper-dive tabs (Kp Forecast, Moon &
+   Sun) so the main row stays focused on the everyday "tonight, milky
+   way, aurora, constellations, planner" decisions. */
+const PRIMARY_TABS = [
+  ["overview", "Tonight"],
+  ["milkyway", "Milky Way"],
+  ["aurora", "Aurora"],
+  ["constellations", "Constellations"],
+  ["planner", "Planner"],
+];
+const DETAIL_TABS = [
+  ["kpforecast", "Kp Forecast"],
+  ["moonsun", "Moon & Sun"],
+];
+function TabNav({ tab, setTab }) {
+  const [openDetails, setOpenDetails] = useState(false);
+  const detailRef = useRef(null);
+  useEffect(() => {
+    if (!openDetails) return;
+    const onDoc = (e) => { if (!detailRef.current?.contains(e.target)) setOpenDetails(false); };
+    const onKey = (e) => { if (e.key === "Escape") setOpenDetails(false); };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [openDetails]);
+  const isDetailTab = DETAIL_TABS.some(([k]) => k === tab);
+  return (
+    <nav
+      className="flex gap-1 mt-8 mb-6 border-b flex-wrap items-center justify-between"
+      style={{ borderColor: "var(--panel-border)" }}
+    >
+      <div className="flex gap-1 flex-wrap">
+        {PRIMARY_TABS.map(([k, label]) => (
+          <button
+            key={k}
+            className={`tab-btn display ${tab === k ? "active" : ""}`}
+            style={{ color: tab === k ? "var(--accent-gold)" : "var(--text-muted)" }}
+            onClick={() => setTab(k)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div ref={detailRef} style={{ position: "relative" }}>
+        <button
+          className={`tab-btn display ${isDetailTab ? "active" : ""}`}
+          style={{ color: isDetailTab ? "var(--accent-gold)" : "var(--text-muted)" }}
+          onClick={() => setOpenDetails((v) => !v)}
+          aria-expanded={openDetails}
+        >
+          Details ▾
+        </button>
+        {openDetails && (
+          <div
+            style={{
+              position: "absolute",
+              top: "calc(100% + 4px)",
+              right: 0,
+              zIndex: 50,
+              minWidth: 180,
+              background: "linear-gradient(180deg, var(--panel-bg-from) 0%, var(--panel-bg-to) 100%)",
+              border: "1px solid var(--frame-border)",
+              borderRadius: 4,
+              padding: "0.4rem",
+              backdropFilter: "blur(6px)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+            }}
+          >
+            {DETAIL_TABS.map(([k, label]) => (
+              <button
+                key={k}
+                onClick={() => { setTab(k); setOpenDetails(false); }}
+                className="ghost"
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "0.45rem 0.7rem",
+                  background: tab === k ? "var(--strip-bg)" : "transparent",
+                  border: "1px solid transparent",
+                  borderColor: tab === k ? "var(--accent-gold)" : "var(--frame-border)",
+                  color: tab === k ? "var(--accent-gold)" : "var(--text-primary)",
+                  marginBottom: 4,
+                  fontSize: "0.8rem",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </nav>
   );
 }
 

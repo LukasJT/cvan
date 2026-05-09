@@ -171,6 +171,14 @@ function MapPicker({ coords, onPick, weather, aurora, bortleAuto, now, overlays 
     if (!overlays.auroralOval || !aurora || !now) return;
     const L = window.L;
     const rings = auroralOvalRings(aurora.kp, now);
+    // Colour the oval by Kp intensity: green = quiet, yellow = unsettled,
+    // orange = G1 minor storm, red = G2+. Same color is used for both
+    // hemispheres so the map reads consistently.
+    const ovalColor =
+      aurora.kp >= 7 ? "#ff3d3d" :     // strong storm (G3+)
+      aurora.kp >= 5 ? "#ff8a3d" :     // moderate storm (G1–G2)
+      aurora.kp >= 4 ? "#ffd24a" :     // unsettled, edge of viewing
+                       "#6dffb0";      // quiet — green
 
     const layers = [];
     const drawHemisphere = (h, isNorth) => {
@@ -187,8 +195,8 @@ function MapPicker({ coords, onPick, weather, aurora, bortleAuto, now, overlays 
             // also firing the map's click handler, which would otherwise
             // teleport the user marker to wherever the oval was clicked.
             const opts = r.day
-              ? { color: "#6dffb0", weight: 1.2, opacity: 0.35, dashArray: "4 6", noClip: true, bubblingMouseEvents: false }
-              : { color: "#6dffb0", weight: 2,   opacity: 0.95, noClip: true, bubblingMouseEvents: false };
+              ? { color: ovalColor, weight: 1.2, opacity: 0.35, dashArray: "4 6", noClip: true, bubblingMouseEvents: false }
+              : { color: ovalColor, weight: 2.5, opacity: 0.95, noClip: true, bubblingMouseEvents: false };
             layers.push(L.polyline(path, opts));
           }
         });
@@ -200,10 +208,17 @@ function MapPicker({ coords, onPick, weather, aurora, bortleAuto, now, overlays 
     drawHemisphere(rings.north, true);
     drawHemisphere(rings.south, false);
 
+    const intensity =
+      aurora.kp >= 7 ? "G3+ strong storm" :
+      aurora.kp >= 5 ? "G1–G2 storm" :
+      aurora.kp >= 4 ? "unsettled" : "quiet";
     const group = L.layerGroup(layers).addTo(map);
     group.eachLayer((l) => {
       if (l.bindTooltip) {
-        l.bindTooltip(`Auroral oval · Kp ${aurora.kp.toFixed(1)} · base ${rings.baseEq}° geomag`, { sticky: true });
+        l.bindTooltip(
+          `Auroral oval · Kp ${aurora.kp.toFixed(1)} (${intensity}) · base ${rings.baseEq}° geomag`,
+          { sticky: true }
+        );
       }
     });
     ovalLayerRef.current = group;
@@ -224,19 +239,13 @@ function MapPicker({ coords, onPick, weather, aurora, bortleAuto, now, overlays 
     if (cloudMarkerRef.current) { map.removeLayer(cloudMarkerRef.current); cloudMarkerRef.current = null; }
     if (!overlays.clouds) return;
     const L = window.L;
-    const today = gibsDate();
-    const yesterday = gibsDateOffset(-1);
-    const tiles = L.tileLayer(
-      `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/${today}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
-      {
-        minZoom: 1,
-        maxNativeZoom: 9,
-        maxZoom: 12,
-        opacity: 0.6,
-        errorTileUrl: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/${yesterday}/GoogleMapsCompatible_Level9/3/2/4.jpg`,
-        attribution: `Imagery © NASA EOSDIS GIBS · VIIRS SNPP true color · ${today}`,
-      }
-    ).addTo(map);
+    // VIIRS publishes each day's tiles in batches as the satellite passes
+    // overhead, so the *current* UTC date often has gaps for hours after
+    // midnight. Default to yesterday — it's near-universally complete and
+    // the cloud field shifts on a multi-hour timescale anyway. Use a tile
+    // class that retries the SAME coords against day-2 if day-1 ever 404s.
+    const tiles = makeGibsCloudLayer(L, [gibsDateOffset(-1), gibsDateOffset(-2)]);
+    tiles.addTo(map);
     cloudLayerRef.current = tiles;
 
     // Forecast cloud % marker at user location (small dot, doesn't bubble).
@@ -340,6 +349,47 @@ function MapPicker({ coords, onPick, weather, aurora, bortleAuto, now, overlays 
   );
 }
 
+/* Cloud-cover tile layer that gracefully falls back through a list of
+   dates per-tile. NASA GIBS publishes each day's tiles incrementally as
+   the satellite passes, so today often has gaps. We try yesterday first
+   and silently retry day-2 only for tiles that 404. */
+function makeGibsCloudLayer(L, dates) {
+  const Layer = L.TileLayer.extend({
+    initialize(options) {
+      L.TileLayer.prototype.initialize.call(this, "_unused_", options);
+    },
+    createTile(coords, done) {
+      const tile = document.createElement("img");
+      tile.alt = "";
+      tile.setAttribute("role", "presentation");
+      tile.crossOrigin = "anonymous";
+      let dateIdx = 0;
+      const tryNext = () => {
+        if (dateIdx >= dates.length) {
+          // Out of fallbacks — leave a transparent tile rather than the
+          // browser's broken-image icon.
+          tile.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+          done(new Error("gibs: no usable date"), tile);
+          return;
+        }
+        const d = dates[dateIdx++];
+        tile.src = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/${d}/GoogleMapsCompatible_Level9/${coords.z}/${coords.y}/${coords.x}.jpg`;
+      };
+      tile.onload = () => done(null, tile);
+      tile.onerror = tryNext;
+      tryNext();
+      return tile;
+    },
+  });
+  return new Layer({
+    minZoom: 1,
+    maxNativeZoom: 9,
+    maxZoom: 12,
+    opacity: 0.65,
+    attribution: `Imagery © NASA EOSDIS GIBS · VIIRS SNPP true color · ${dates[0]}`,
+  });
+}
+
 /* Day/night canvas tile layer. Builds an L.GridLayer subclass that
    computes the sun's altitude per pixel and writes a translucent blue
    to mark progressively darker twilight stages:
@@ -388,11 +438,14 @@ function makeDayNightLayer(L, date) {
           const sinAlt = sinLat * sinDec + cosLat * cosDec * Math.cos(haRad);
           const altDeg = Math.asin(Math.max(-1, Math.min(1, sinAlt))) * RAD;
 
+          // Alpha tuned so the night side reads clearly even with the LP
+          // atlas tiles and the auroral oval drawn on top. Visible gradient
+          // through civil → nautical → astro → full night.
           let a = 0;
-          if (altDeg <= -18)      a = 140;
-          else if (altDeg <= -12) a = 115;
-          else if (altDeg <= -6)  a = 82;
-          else if (altDeg <= 0)   a = 46;
+          if (altDeg <= -18)      a = 210;
+          else if (altDeg <= -12) a = 175;
+          else if (altDeg <= -6)  a = 130;
+          else if (altDeg <= 0)   a = 80;
 
           const i = (py * size.x + px) * 4;
           buf[i]     = 12;   // dark navy R

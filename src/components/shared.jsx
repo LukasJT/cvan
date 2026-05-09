@@ -156,10 +156,13 @@ export function OutOfRangeNotice({ what, horizon }) {
   );
 }
 
-/* Settings cog (top-left). Click toggles a popover with theme picker.
-   Designed to grow as more app-level settings get added later. */
-export function SettingsCog({ theme, setTheme }) {
+/* Settings cog (top-left). Click toggles a popover. The popover itself
+   contains a small "Theme" cog (opens a sub-popover with the swatches)
+   and an "i" info button at the bottom that routes to the in-app
+   citations / About page. */
+export function SettingsCog({ theme, setTheme, onOpenInfo }) {
   const [open, setOpen] = useState(false);
+  const [themeOpen, setThemeOpen] = useState(false);
   const popoverRef = useRef(null);
   const buttonRef = useRef(null);
 
@@ -169,8 +172,9 @@ export function SettingsCog({ theme, setTheme }) {
       if (popoverRef.current?.contains(e.target)) return;
       if (buttonRef.current?.contains(e.target)) return;
       setOpen(false);
+      setThemeOpen(false);
     };
-    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") { setOpen(false); setThemeOpen(false); } };
     document.addEventListener("mousedown", onDocClick);
     document.addEventListener("keydown", onKey);
     return () => {
@@ -211,7 +215,7 @@ export function SettingsCog({ theme, setTheme }) {
             top: "calc(100% + 6px)",
             left: 0,
             zIndex: 100,
-            minWidth: 220,
+            minWidth: 240,
             background: "linear-gradient(180deg, var(--panel-bg-from) 0%, var(--panel-bg-to) 100%)",
             border: "1px solid var(--frame-border)",
             borderRadius: 4,
@@ -220,20 +224,82 @@ export function SettingsCog({ theme, setTheme }) {
             boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
           }}
         >
-          <div className="mono text-xs uppercase tracking-widest mb-2 muted">Theme</div>
-          <div className="flex flex-col gap-1">
-            {THEMES.map((t) => (
-              <ThemeOption
-                key={t}
-                value={t}
-                current={theme}
-                onPick={(v) => { setTheme(v); setOpen(false); }}
-              />
-            ))}
-          </div>
-          <div className="mt-2 mono text-xs subtle" style={{ borderTop: "1px solid var(--panel-border)", paddingTop: "0.5rem" }}>
-            Red mode preserves dark adaptation for nighttime field use.
-          </div>
+          <div className="mono text-xs uppercase tracking-widest mb-2 muted">Settings</div>
+
+          {/* Theme — represented as a sub-cog row that flips out the swatches */}
+          <button
+            className="ghost"
+            onClick={() => setThemeOpen((v) => !v)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.6rem",
+              width: "100%",
+              padding: "0.5rem",
+              border: "1px solid var(--frame-border)",
+              borderColor: themeOpen ? "var(--accent-gold)" : "var(--frame-border)",
+              background: themeOpen ? "var(--strip-bg)" : "transparent",
+              cursor: "pointer",
+              borderRadius: 2,
+            }}
+          >
+            <span style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              width: 22, height: 22, color: "var(--accent-gold)",
+            }}>
+              <CogIcon spinning={themeOpen} small />
+            </span>
+            <span className="display gold" style={{ fontSize: "0.78rem" }}>Color theme</span>
+            <span className="mono muted" style={{ marginLeft: "auto", fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              {theme}
+            </span>
+          </button>
+          {themeOpen && (
+            <div className="flex flex-col gap-1 mt-1" style={{ paddingLeft: "0.5rem" }}>
+              {THEMES.map((t) => (
+                <ThemeOption
+                  key={t}
+                  value={t}
+                  current={theme}
+                  onPick={(v) => { setTheme(v); }}
+                />
+              ))}
+              <div className="mono subtle mt-1" style={{ fontSize: "0.62rem" }}>
+                Red mode preserves dark adaptation for field use.
+              </div>
+            </div>
+          )}
+
+          {/* Info / About + citations */}
+          <button
+            className="ghost"
+            onClick={() => { onOpenInfo?.(); setOpen(false); setThemeOpen(false); }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.6rem",
+              width: "100%",
+              marginTop: "0.6rem",
+              padding: "0.5rem",
+              border: "1px solid var(--frame-border)",
+              cursor: "pointer",
+              borderRadius: 2,
+            }}
+            title="About CVAN, methodology, and full citations"
+          >
+            <span style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              width: 22, height: 22,
+              border: "1px solid var(--accent-gold)", borderRadius: "50%",
+              color: "var(--accent-gold)",
+              fontFamily: "Cormorant Garamond, serif",
+              fontStyle: "italic",
+              fontWeight: 600,
+              fontSize: "0.85rem",
+              lineHeight: 1,
+            }}>i</span>
+            <span className="display gold" style={{ fontSize: "0.78rem" }}>About &amp; sources</span>
+          </button>
         </div>
       )}
     </div>
@@ -285,9 +351,10 @@ function ThemeOption({ value, current, onPick }) {
   );
 }
 
-function CogIcon({ spinning }) {
+function CogIcon({ spinning, small }) {
+  const sz = small ? 14 : 18;
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "transform 0.3s ease", transform: spinning ? "rotate(60deg)" : "none" }}>
+    <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "transform 0.3s ease", transform: spinning ? "rotate(60deg)" : "none" }}>
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
