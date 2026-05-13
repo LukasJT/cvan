@@ -204,10 +204,12 @@ function MilkyWayNightChart({ coords, now, tzName }) {
         <Legend color="var(--accent-green)" label="Astronomical night" dashed />
       </div>
       <div className="mono text-xs mt-2 subtle">
-        The purple curve is the Galactic Core's altitude. The short tick mark at each hour
-        is angled to match how the Milky Way band is oriented in the sky at that moment —
-        nearly horizontal as it rises in the east, steepest as it transits south, then
-        flattening again toward the west.
+        The purple curve is the Galactic Core's altitude. At each hour, a short tick is
+        drawn through the core: its tilt matches how the Milky Way is angled in the sky
+        at that moment, and its length is scaled to how much of the bright band (Norma →
+        bulge → Cygnus → Cassiopeia) is above the horizon. From a mid-latitude northern
+        site only the half running from the bulge toward Cygnus is visible, so the tick
+        stays short — far from a horizon-to-horizon arc.
       </div>
     </div>
   );

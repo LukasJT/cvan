@@ -220,6 +220,20 @@ export const MILKY_WAY_BAND_TANGENT = {
   after:  galacticToEquatorial(+15, 0),
 };
 
+/* Pre-sampled equatorial positions along the bright Milky Way band, b=0,
+   from the Norma area (l=-60°) through the bulge (l=0°) and on through
+   Cygnus to Cassiopeia (l=+120°). Used to measure how much of the band
+   is actually above the horizon at any given moment, so chart ticks can
+   be scaled to the visible arc instead of always drawing full-length. */
+export const MILKY_WAY_BRIGHT_BAND = (() => {
+  const out = [];
+  for (let l = -60; l <= 120; l += 5) {
+    out.push({ l, ...galacticToEquatorial(l, 0) });
+  }
+  return out;
+})();
+export const MILKY_WAY_BRIGHT_BAND_SPAN = 180; // degrees of l covered above
+
 /* IGRF-13 geomagnetic north pole, epoch 2025 (NCEI). Drifts ~10 km/yr;
    the dipole approximation is good to ~3° magnetic latitude — adequate
    for aurora visibility, where the equatorward boundary shifts ~3° per Kp. */
@@ -445,6 +459,27 @@ export function altitudeCurve(anchor, lat, lon) {
     const bAfter  = MILKY_WAY_BAND_TANGENT.after;
     const tangBefore = equatorialToHorizontal(bBefore.ra, bBefore.dec, sidereal, lat);
     const tangAfter  = equatorialToHorizontal(bAfter.ra,  bAfter.dec,  sidereal, lat);
+    /* Walk the bright band starting at the core in both galactic-
+       longitude directions; sum degrees of l where the band stays above
+       the horizon. The first sample to drop below the horizon (in either
+       direction) ends the contiguous visible arc through the core. This
+       gives the angular extent of the bright Milky Way that's actually
+       above your local horizon at this moment. */
+    let arcForward = 0, arcBackward = 0;
+    for (const p of MILKY_WAY_BRIGHT_BAND) {
+      if (p.l <= 0) continue;
+      const a = equatorialToHorizontal(p.ra, p.dec, sidereal, lat).alt;
+      if (a < 0) break;
+      arcForward = p.l;
+    }
+    for (let i = MILKY_WAY_BRIGHT_BAND.length - 1; i >= 0; i--) {
+      const p = MILKY_WAY_BRIGHT_BAND[i];
+      if (p.l >= 0) continue;
+      const a = equatorialToHorizontal(p.ra, p.dec, sidereal, lat).alt;
+      if (a < 0) break;
+      arcBackward = -p.l;
+    }
+    const bandVisibleArc = coreHz.alt > 0 ? arcForward + arcBackward : 0;
     const phase = moonPhase(jd);
     const phaseAngle = Math.acos(2 * phase.illumination - 1) * RAD;
     samples.push({
@@ -459,6 +494,7 @@ export function altitudeCurve(anchor, lat, lon) {
         beforeAlt: tangBefore.alt, beforeAz: tangBefore.az,
         afterAlt:  tangAfter.alt,  afterAz:  tangAfter.az,
       },
+      bandVisibleArc,
       moonIllum: phase.illumination,
       moonBrightness: moonSkyBrightness(moonHz.alt, phaseAngle),
     });

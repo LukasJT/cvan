@@ -71,12 +71,16 @@ export function AltitudeChart({ curve }) {
 
   /* Tilted "tick marks" showing the actual angle of the Milky Way band
      in the sky at that moment (inspired by Travis Hance's milky-way-
-     planner). For each sampled time, project two points straddling the
-     core along the galactic longitude into the local horizontal frame;
-     the chord between them, scaled to a fixed pixel length and centred
-     on the core's position, draws the band's local tilt. Tick marks are
-     suppressed when the core is below the horizon. */
-  const TICK_PX = 18;
+     planner), with length scaled to how much of the bright band is
+     actually above the horizon at that time. The bright band spans
+     180° of galactic longitude (Norma → Cassiopeia); the tick reaches
+     its full length only when all 180° is visible. From a mid-latitude
+     northern site like the GTA the southern half stays below the
+     horizon, so the tick stays short — a visual cue that only part of
+     the Milky Way is up tonight. Suppressed when the core itself is
+     below the horizon. */
+  const TICK_PX_MAX = 28;
+  const TICK_PX_MIN = 4;
   const TICK_EVERY = 2; // every other 30-min sample → one tick per hour
   const ticks = [];
   curve.forEach((s, i) => {
@@ -88,20 +92,22 @@ export function AltitudeChart({ curve }) {
     if (dAz > 180) dAz -= 360;
     if (dAz < -180) dAz += 360;
     const dAlt = t.afterAlt - t.beforeAlt;
-    // azimuth grows clockwise from N; "right" on a south-facing chart is
-    // increasing azimuth, so a positive dAz tilts the screen-tick to
-    // the right. Vertical = altitude.
     const len = Math.sqrt(dAz * dAz + dAlt * dAlt) || 1;
     const ux = dAz / len;
     const uy = -dAlt / len; // SVG y inverts altitude
+
+    // Scale length by the actual visible arc of the bright band.
+    const arc = s.bandVisibleArc ?? 0;
+    const tickPx = Math.max(TICK_PX_MIN, (arc / 180) * TICK_PX_MAX);
+
     const cx = xScale(s.h);
     const cy = yScale(s.coreAlt);
     ticks.push({
-      x1: cx - (TICK_PX / 2) * ux,
-      y1: cy - (TICK_PX / 2) * uy,
-      x2: cx + (TICK_PX / 2) * ux,
-      y2: cy + (TICK_PX / 2) * uy,
-      cx, cy,
+      x1: cx - (tickPx / 2) * ux,
+      y1: cy - (tickPx / 2) * uy,
+      x2: cx + (tickPx / 2) * ux,
+      y2: cy + (tickPx / 2) * uy,
+      cx, cy, arc,
     });
   });
 
