@@ -251,6 +251,35 @@ function DayCurveChart({ curve, cloudByHour, cloudInRange }) {
   const moonPath = curve.map((s, i) => `${i === 0 ? "M" : "L"} ${xScale(s.h)} ${yScale(s.moonAlt)}`).join(" ");
   const tgtPath = curve.map((s, i) => `${i === 0 ? "M" : "L"} ${xScale(s.h)} ${yScale(s.targetAlt)}`).join(" ");
 
+  /* Hourly Milky Way band ticks (same idea as the Tonight/Milky Way
+     altitude chart). Tilt = band's actual orientation in the sky;
+     length = visible arc of the bright band through the core. Drawn
+     centred on the Galactic Core's altitude so they line up with the
+     band wherever it actually is, independent of which specific target
+     the planner is set to. */
+  const MW_MAX_PX = 28, MW_MIN_PX = 4;
+  const mwTicks = [];
+  curve.forEach((s, i) => {
+    if (i % 2 !== 0) return;
+    if (s.coreAlt == null || s.coreAlt < 0) return;
+    if (!s.bandTangent) return;
+    let dAz = s.bandTangent.afterAz - s.bandTangent.beforeAz;
+    if (dAz > 180) dAz -= 360;
+    if (dAz < -180) dAz += 360;
+    const dAlt = s.bandTangent.afterAlt - s.bandTangent.beforeAlt;
+    const len = Math.sqrt(dAz * dAz + dAlt * dAlt) || 1;
+    const ux = dAz / len;
+    const uy = -dAlt / len;
+    const tickPx = Math.max(MW_MIN_PX, ((s.bandVisibleArc ?? 0) / 180) * MW_MAX_PX);
+    const cx = xScale(s.h);
+    const cy = yScale(s.coreAlt);
+    mwTicks.push({
+      x1: cx - (tickPx / 2) * ux, y1: cy - (tickPx / 2) * uy,
+      x2: cx + (tickPx / 2) * ux, y2: cy + (tickPx / 2) * uy,
+      cx, cy,
+    });
+  });
+
   // Shade where conditions match (sun<-18, moon below threshold, target up)
   const okBands = [];
   let s = null;
@@ -292,6 +321,13 @@ function DayCurveChart({ curve, cloudByHour, cloudInRange }) {
       <path d={sunPath} fill="none" stroke="var(--accent-warm)" strokeWidth="1.2" />
       <path d={moonPath} fill="none" stroke="#e8e8e8" strokeWidth="1.2" />
       <path d={tgtPath} fill="none" stroke="var(--accent-purple)" strokeWidth="2" />
+      {/* Milky Way band tilt ticks centred on the Galactic Core's path */}
+      {mwTicks.map((tk, i) => (
+        <g key={`mw-${i}`}>
+          <line x1={tk.x1} y1={tk.y1} x2={tk.x2} y2={tk.y2} stroke="var(--accent-purple)" strokeWidth="2" strokeLinecap="round" opacity="0.85" />
+          <circle cx={tk.cx} cy={tk.cy} r="1.4" fill="var(--accent-purple)" />
+        </g>
+      ))}
       <text x={P} y={yScale(0) - 3} fontSize="8" fontFamily="JetBrains Mono" fill="var(--accent-gold)" opacity="0.7">HORIZON</text>
       <text x={P} y={yScale(-18) - 3} fontSize="8" fontFamily="JetBrains Mono" fill="var(--accent-green)" opacity="0.7">−18° ASTRO NIGHT</text>
       {[0, 6, 12, 18, 24, 30, 36].map((h) => (
@@ -300,9 +336,10 @@ function DayCurveChart({ curve, cloudByHour, cloudInRange }) {
         </text>
       ))}
       <g fontFamily="JetBrains Mono" fontSize="9">
-        <text x={W - 220} y={20} fill="var(--accent-warm)">— sun</text>
-        <text x={W - 170} y={20} fill="#e8e8e8">— moon</text>
-        <text x={W - 120} y={20} fill="var(--accent-purple)">— target</text>
+        <text x={W - 320} y={20} fill="var(--accent-warm)">— sun</text>
+        <text x={W - 270} y={20} fill="#e8e8e8">— moon</text>
+        <text x={W - 220} y={20} fill="var(--accent-purple)">— target</text>
+        <text x={W - 155} y={20} fill="var(--accent-purple)">/ MW band tilt</text>
         <text x={W - 60} y={20} fill="var(--text-muted)" opacity="0.7">▮ cloud</text>
       </g>
     </svg>
@@ -363,14 +400,12 @@ function bestTargetWindow(curve) {
    - Window darkness:  altitude-centric — what's the target's PEAK altitude
                        during astronomical-night-with-no-moon, and is there
                        at least a usable amount of dark time? Tiers are
-                       calibrated so a target that culminates at a "decent"
-                       altitude for the user's latitude can still earn Good
-                       — e.g. the Galactic Core peaks at ~16° from southern
-                       Ontario and that's the BEST that latitude allows; it
-                       shouldn't be capped at Fair on an otherwise perfect
-                       night.
-                       peak ≥40° & dark ≥1h EX | peak ≥25° & dark ≥1h GR
-                       peak ≥15° & dark ≥0.5h GO | peak ≥5° & dark ≥0.5h FA
+                       relaxed so a target that culminates at a "decent"
+                       altitude for the user's latitude (e.g. Galactic Core
+                       at ~17° from southern Ontario) still earns Great on
+                       an otherwise perfect dark-moon night.
+                       peak ≥30° & dark ≥1h EX | peak ≥15° & dark ≥1h GR
+                       peak ≥8° & dark ≥0.5h GO | peak ≥3° & dark ≥0.5h FA
                        else PO
    - Cloud cover %:    <10 EX | <20 GR | <40 GO | <70 FA | else PO */
 function scoreFactors(window, curve, cloudAvg, bortle, cloudInRange) {
@@ -407,11 +442,11 @@ function scoreFactors(window, curve, cloudAvg, bortle, cloudInRange) {
   }
   const astroHours = astroSamples * 0.5;
   let windowTier = 0;
-  if      (peakInDark >= 40 && astroHours >= 1)   windowTier = 4;
-  else if (peakInDark >= 25 && astroHours >= 1)   windowTier = 3;
-  else if (peakInDark >= 15 && astroHours >= 0.5) windowTier = 2;
-  else if (peakInDark >=  5 && astroHours >= 0.5) windowTier = 1;
-  // else 0 (Poor) — target never climbs above 5° during dark sky.
+  if      (peakInDark >= 30 && astroHours >= 1)   windowTier = 4;
+  else if (peakInDark >= 15 && astroHours >= 1)   windowTier = 3;
+  else if (peakInDark >=  8 && astroHours >= 0.5) windowTier = 2;
+  else if (peakInDark >=  3 && astroHours >= 0.5) windowTier = 1;
+  // else 0 (Poor) — target never climbs above 3° during dark sky.
 
   // Cloud cover (only if forecast is in range).
   let cloudTier = null;
