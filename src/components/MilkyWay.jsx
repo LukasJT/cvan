@@ -199,7 +199,7 @@ function MilkyWayNightChart({ coords, now, tzName }) {
         </div>
       </div>
 
-      <AltitudeChart curve={curve} />
+      <AltitudeChart curve={curve} tzName={tzName} />
       <div className="mt-3 flex gap-4 mono text-xs flex-wrap secondary">
         <Legend color="var(--accent-warm)" label="Sun" />
         <Legend color="#e8e8e8" label="Moon" />

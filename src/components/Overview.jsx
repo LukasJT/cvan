@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useState } from "react";
 import { fmtDeg, fmtTime, geomagneticLatitude } from "../astro.js";
 import { DataCell, ScoreRow, Legend, VerdictCard, ScoreDial } from "./shared.jsx";
 import { milkyWayVerdict, auroraVerdict, deepSkyVerdict, auroraVerdictShort, cloudVerdict } from "../verdicts.js";
@@ -42,7 +42,7 @@ export function Overview({ sky, weather, aurora, bortle, score, curve, coords, w
 
       <div className="panel corner p-6">
         <div className="mono text-xs uppercase tracking-widest mb-3 muted">Tonight's Sky · Altitude over Time</div>
-        <AltitudeChart curve={curve} />
+        <AltitudeChart curve={curve} tzName={weather?.timezone} />
         <div className="mt-3 flex gap-4 mono text-xs flex-wrap secondary">
           <Legend color="var(--accent-warm)" label="Sun" />
           <Legend color="#e8e8e8" label="Moon" />
@@ -60,7 +60,7 @@ export function Overview({ sky, weather, aurora, bortle, score, curve, coords, w
   );
 }
 
-export function AltitudeChart({ curve }) {
+export function AltitudeChart({ curve, tzName }) {
   if (!curve) return null;
   const W = 700, H = 200, P = 30;
   const xScale = (h) => P + ((h - 0) / 36) * (W - P * 2);
@@ -68,6 +68,44 @@ export function AltitudeChart({ curve }) {
 
   const linePath = (key) =>
     curve.map((s, i) => `${i === 0 ? "M" : "L"} ${xScale(s.h)} ${yScale(s[key])}`).join(" ");
+
+  /* Interactive cursor — hover or drag along the chart to read the exact
+     altitude of each body and the local time at that moment. The cursor
+     stays pinned after click/tap and clears when leaving the chart with
+     no pin (or on a second click on empty area). */
+  const svgRef = useRef(null);
+  const [hoverH, setHoverH] = useState(null);
+  const [pinnedH, setPinnedH] = useState(null);
+  const activeH = pinnedH ?? hoverH;
+  const cursorSample = activeH != null
+    ? curve.reduce((best, s) => Math.abs(s.h - activeH) < Math.abs(best.h - activeH) ? s : best, curve[0])
+    : null;
+
+  const eventToHour = (e) => {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const rect = svg.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0]?.clientX : e.clientX;
+    if (clientX == null) return null;
+    const fx = (clientX - rect.left) / rect.width;
+    const xViewBox = fx * W;
+    const h = ((xViewBox - P) / (W - P * 2)) * 36;
+    if (h < 0 || h > 36) return null;
+    return h;
+  };
+
+  const onMove = (e) => {
+    const h = eventToHour(e);
+    setHoverH(h);
+  };
+  const onLeave = () => setHoverH(null);
+  const onClick = (e) => {
+    const h = eventToHour(e);
+    if (h == null) { setPinnedH(null); return; }
+    // Click toggles: if pinned near this spot, unpin; otherwise pin here.
+    if (pinnedH != null && Math.abs(pinnedH - h) < 0.6) setPinnedH(null);
+    else setPinnedH(h);
+  };
 
   /* Tilted "tick marks" showing the actual angle of the Milky Way band
      in the sky at that moment (inspired by Travis Hance's milky-way-
@@ -122,30 +160,129 @@ export function AltitudeChart({ curve }) {
   });
   if (bandStart !== null) nightBands.push([bandStart, 36]);
 
+  const fmtAt = (d, opts) =>
+    tzName ? d.toLocaleString([], { ...opts, timeZone: tzName })
+           : d.toLocaleString([], opts);
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: "100%" }}>
-      {nightBands.map(([a, b], i) => (
-        <rect key={i} x={xScale(a)} y={P} width={xScale(b) - xScale(a)} height={H - P * 2} fill="rgba(109,255,176,0.06)" />
-      ))}
-      <line x1={P} y1={yScale(0)} x2={W - P} y2={yScale(0)} stroke="var(--accent-gold)" strokeWidth="1" strokeDasharray="2 4" opacity="0.5" />
-      <line x1={P} y1={yScale(-18)} x2={W - P} y2={yScale(-18)} stroke="var(--accent-green)" strokeWidth="0.5" strokeDasharray="2 4" opacity="0.3" />
-      <path d={linePath("sunAlt")} fill="none" stroke="var(--accent-warm)" strokeWidth="1.5" />
-      <path d={linePath("moonAlt")} fill="none" stroke="#e8e8e8" strokeWidth="1.5" />
-      <path d={linePath("coreAlt")} fill="none" stroke="var(--accent-purple)" strokeWidth="1.5" opacity="0.45" />
-      {/* Angled MW tick marks at hourly intervals */}
-      {ticks.map((tk, i) => (
-        <g key={i}>
-          <line x1={tk.x1} y1={tk.y1} x2={tk.x2} y2={tk.y2} stroke="var(--accent-purple)" strokeWidth="2.4" strokeLinecap="round" />
-          <circle cx={tk.cx} cy={tk.cy} r="1.6" fill="var(--accent-purple)" />
-        </g>
-      ))}
-      <text x={P} y={yScale(0) - 4} fontSize="9" fontFamily="JetBrains Mono" fill="var(--accent-gold)" opacity="0.7">HORIZON</text>
-      <text x={P} y={yScale(-18) - 4} fontSize="9" fontFamily="JetBrains Mono" fill="var(--accent-green)" opacity="0.6">−18° (ASTRO NIGHT)</text>
-      {[0, 6, 12, 18, 24, 30, 36].map((h) => (
-        <text key={h} x={xScale(h)} y={H - 8} fontSize="9" fontFamily="JetBrains Mono" fill="var(--text-muted)" textAnchor="middle">
-          {((h + 12) % 24).toString().padStart(2, "0")}
-        </text>
-      ))}
-    </svg>
+    <div style={{ position: "relative", width: "100%" }}>
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${W} ${H}`}
+        width="100%"
+        style={{ maxWidth: "100%", cursor: "crosshair", touchAction: "none", userSelect: "none" }}
+        onMouseMove={onMove}
+        onMouseLeave={onLeave}
+        onTouchMove={onMove}
+        onTouchStart={onMove}
+        onClick={onClick}
+      >
+        {nightBands.map(([a, b], i) => (
+          <rect key={i} x={xScale(a)} y={P} width={xScale(b) - xScale(a)} height={H - P * 2} fill="rgba(109,255,176,0.06)" />
+        ))}
+        <line x1={P} y1={yScale(0)} x2={W - P} y2={yScale(0)} stroke="var(--accent-gold)" strokeWidth="1" strokeDasharray="2 4" opacity="0.5" />
+        <line x1={P} y1={yScale(-18)} x2={W - P} y2={yScale(-18)} stroke="var(--accent-green)" strokeWidth="0.5" strokeDasharray="2 4" opacity="0.3" />
+        <path d={linePath("sunAlt")} fill="none" stroke="var(--accent-warm)" strokeWidth="1.5" />
+        <path d={linePath("moonAlt")} fill="none" stroke="#e8e8e8" strokeWidth="1.5" />
+        <path d={linePath("coreAlt")} fill="none" stroke="var(--accent-purple)" strokeWidth="1.5" opacity="0.45" />
+        {/* Angled MW tick marks at hourly intervals */}
+        {ticks.map((tk, i) => (
+          <g key={i}>
+            <line x1={tk.x1} y1={tk.y1} x2={tk.x2} y2={tk.y2} stroke="var(--accent-purple)" strokeWidth="2.4" strokeLinecap="round" />
+            <circle cx={tk.cx} cy={tk.cy} r="1.6" fill="var(--accent-purple)" />
+          </g>
+        ))}
+        <text x={P} y={yScale(0) - 4} fontSize="9" fontFamily="JetBrains Mono" fill="var(--accent-gold)" opacity="0.7">HORIZON</text>
+        <text x={P} y={yScale(-18) - 4} fontSize="9" fontFamily="JetBrains Mono" fill="var(--accent-green)" opacity="0.6">−18° (ASTRO NIGHT)</text>
+        {[0, 6, 12, 18, 24, 30, 36].map((h) => (
+          <text key={h} x={xScale(h)} y={H - 8} fontSize="9" fontFamily="JetBrains Mono" fill="var(--text-muted)" textAnchor="middle">
+            {((h + 12) % 24).toString().padStart(2, "0")}
+          </text>
+        ))}
+
+        {/* Hover/pin cursor */}
+        {cursorSample && (() => {
+          const cx = xScale(cursorSample.h);
+          const sunY = yScale(cursorSample.sunAlt);
+          const moonY = yScale(cursorSample.moonAlt);
+          const coreY = yScale(cursorSample.coreAlt);
+          return (
+            <g pointerEvents="none">
+              <line
+                x1={cx} y1={P} x2={cx} y2={H - P}
+                stroke="var(--accent-gold)"
+                strokeWidth={pinnedH != null ? 1.4 : 1}
+                strokeDasharray={pinnedH != null ? "" : "3 3"}
+                opacity={pinnedH != null ? 0.9 : 0.6}
+              />
+              <circle cx={cx} cy={sunY}  r="4" fill="var(--accent-warm)"   stroke="var(--bg-base)" strokeWidth="1.2" />
+              <circle cx={cx} cy={moonY} r="4" fill="#e8e8e8"               stroke="var(--bg-base)" strokeWidth="1.2" />
+              <circle cx={cx} cy={coreY} r="4" fill="var(--accent-purple)"  stroke="var(--bg-base)" strokeWidth="1.2" />
+            </g>
+          );
+        })()}
+      </svg>
+
+      {/* Tooltip overlay (HTML, follows the cursor sample) */}
+      {cursorSample && (() => {
+        const cx = xScale(cursorSample.h);
+        // Flip to the left of the cursor when near the right edge.
+        const flip = cx > W * 0.6;
+        const leftPct = (cx / W) * 100;
+        return (
+          <div
+            style={{
+              position: "absolute",
+              left: `${leftPct}%`,
+              top: "8px",
+              transform: flip ? "translate(calc(-100% - 10px), 0)" : "translate(10px, 0)",
+              pointerEvents: "none",
+              background: "linear-gradient(180deg, var(--panel-bg-from) 0%, var(--panel-bg-to) 100%)",
+              border: "1px solid var(--frame-border)",
+              borderRadius: 3,
+              padding: "0.45rem 0.6rem",
+              minWidth: 150,
+              backdropFilter: "blur(6px)",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: "0.7rem",
+              lineHeight: 1.45,
+              color: "var(--text-primary)",
+              zIndex: 5,
+            }}
+          >
+            <div className="display gold" style={{ fontSize: "0.78rem", marginBottom: 4 }}>
+              {fmtAt(cursorSample.t, { weekday: "short", hour: "2-digit", minute: "2-digit" })}
+              {pinnedH != null && <span style={{ marginLeft: 6, color: "var(--accent-gold)" }}>📌</span>}
+            </div>
+            <CursorRow color="var(--accent-warm)"   label="Sun"  value={fmtDeg(cursorSample.sunAlt)} />
+            <CursorRow color="#e8e8e8"               label="Moon" value={fmtDeg(cursorSample.moonAlt)} />
+            <CursorRow color="var(--accent-purple)"  label="MW Core" value={fmtDeg(cursorSample.coreAlt)} />
+            <div style={{ marginTop: 4, color: "var(--text-muted)" }}>
+              {twilightLabel(cursorSample.sunAlt)}
+              {pinnedH == null && <span style={{ marginLeft: 6, color: "var(--text-subtle)" }}>· click to pin</span>}
+            </div>
+          </div>
+        );
+      })()}
+    </div>
   );
+}
+
+function CursorRow({ color, label, value }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+      <span style={{ color: "var(--text-secondary)", flex: 1 }}>{label}</span>
+      <span style={{ color: "var(--accent-gold)" }}>{value}</span>
+    </div>
+  );
+}
+
+function twilightLabel(sunAlt) {
+  if (sunAlt > -0.833) return "Daylight";
+  if (sunAlt > -6) return "Civil twilight";
+  if (sunAlt > -12) return "Nautical twilight";
+  if (sunAlt > -18) return "Astro twilight";
+  return "Astronomical night";
 }
