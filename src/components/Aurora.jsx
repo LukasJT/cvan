@@ -86,20 +86,18 @@ function ModeToggle({ mode, setMode }) {
 /* ============================================================== FORECAST VIEW
    Long-term planning: viewing geometry, conditions panel, 3-day Kp spark. */
 function ForecastView({ aurora, weather, bortle, sky, coords, kpForecast, now, weatherStale }) {
-  const [offsetHours, setOffsetHours] = useState(0);
+  const [previewTime, setPreviewTime] = useState(null);
   const tzName = weather?.timezone ?? null;
-
-  const previewTime = useMemo(
-    () => new Date((now ?? new Date()).getTime() + offsetHours * 3600000),
-    [now, offsetHours]
-  );
+  const nowDate = now ?? new Date();
+  const isNowPreview = previewTime == null;
+  const effectivePreview = isNowPreview ? nowDate : previewTime;
 
   const previewKpBucket = useMemo(() => {
-    if (offsetHours === 0) return null;
-    return kpAt(kpForecast, previewTime.getTime());
-  }, [kpForecast, previewTime, offsetHours]);
+    if (isNowPreview) return null;
+    return kpAt(kpForecast, effectivePreview.getTime());
+  }, [kpForecast, effectivePreview, isNowPreview]);
   const kp = previewKpBucket ? previewKpBucket.kp : aurora.kp;
-  const kpSource = offsetHours === 0
+  const kpSource = isNowPreview
     ? "current observed"
     : previewKpBucket
       ? (previewKpBucket.observed === "predicted" ? "predicted" : "observed")
@@ -110,14 +108,14 @@ function ForecastView({ aurora, weather, bortle, sky, coords, kpForecast, now, w
   const absGeoLat = Math.abs(geomagLat);
 
   const previewSky = useMemo(
-    () => offsetHours === 0 ? sky : computeSky(previewTime, coords),
-    [sky, previewTime, coords, offsetHours]
+    () => isNowPreview ? sky : computeSky(effectivePreview, coords),
+    [sky, effectivePreview, coords, isNowPreview]
   );
   const previewCloud = useMemo(() => {
-    if (offsetHours === 0) return weatherStale ? null : weather?.current?.cloud_cover ?? null;
-    return cloudCoverAt(weather, previewTime.getTime());
-  }, [offsetHours, previewTime, weather, weatherStale]);
-  const previewCloudOutOfRange = offsetHours > 0 && previewCloud == null;
+    if (isNowPreview) return weatherStale ? null : weather?.current?.cloud_cover ?? null;
+    return cloudCoverAt(weather, effectivePreview.getTime());
+  }, [isNowPreview, effectivePreview, weather, weatherStale]);
+  const previewCloudOutOfRange = !isNowPreview && previewCloud == null;
 
   const cloud = weatherStale ? null : weather?.current?.cloud_cover ?? null;
   const verdict = auroraVerdict(aurora, coords.lat, cloud, geomagLat);
@@ -156,12 +154,12 @@ function ForecastView({ aurora, weather, bortle, sky, coords, kpForecast, now, w
 
       <div className="panel corner p-6">
         <div className="mono text-xs uppercase tracking-widest mb-3 muted">
-          Conditions Affecting {offsetHours === 0 ? "Aurora Viewing" : "Previewed Aurora Viewing"}
+          Conditions Affecting {isNowPreview ? "Aurora Viewing" : "Previewed Aurora Viewing"}
         </div>
         <TimeOffsetSlider
-          now={now ?? new Date()}
-          offsetHours={offsetHours}
-          setOffsetHours={setOffsetHours}
+          now={nowDate}
+          previewTime={previewTime}
+          setPreviewTime={setPreviewTime}
           maxHours={MAX_HOURS}
           tzName={tzName}
           label="View at"
@@ -172,11 +170,11 @@ function ForecastView({ aurora, weather, bortle, sky, coords, kpForecast, now, w
           <FactorRow label="Your geomagnetic latitude" status={absGeoLat >= threshold ? "good" : absGeoLat >= threshold - 5 ? "fair" : "bad"}
             note={`At ${absGeoLat.toFixed(1)}° geomag |lat| (geographic ${Math.abs(coords.lat).toFixed(1)}°), ${absGeoLat >= threshold ? "you're inside the auroral oval for this Kp." : "you'd need higher Kp or to travel poleward."}`} />
           <FactorRow label="Cloud cover"
-            status={previewCloudOutOfRange || (offsetHours === 0 && weatherStale) ? "unknown" : previewCloud == null ? "unknown" : previewCloud < 30 ? "good" : previewCloud < 60 ? "fair" : "bad"}
+            status={previewCloudOutOfRange || (isNowPreview && weatherStale) ? "unknown" : previewCloud == null ? "unknown" : previewCloud < 30 ? "good" : previewCloud < 60 ? "fair" : "bad"}
             note={
               previewCloudOutOfRange
                 ? "Beyond 16-day Open-Meteo forecast — clouds excluded from score."
-                : (offsetHours === 0 && weatherStale)
+                : (isNowPreview && weatherStale)
                   ? "Out of weather forecast range — clouds excluded from score."
                   : previewCloud != null
                     ? `${previewCloud}% — aurora is in upper atmosphere (~100km) so any clouds block it entirely.`
@@ -189,15 +187,15 @@ function ForecastView({ aurora, weather, bortle, sky, coords, kpForecast, now, w
           <FactorRow label="Twilight" status={previewSky.tw.code === "night" ? "good" : previewSky.tw.code === "astro" || previewSky.tw.code === "nautical" ? "fair" : "bad"}
             note={`${previewSky.tw.name}. Aurora visible during nautical twilight if strong, but full darkness gives best contrast.`} />
         </div>
-        {(weatherStale && offsetHours === 0) && <OutOfRangeNotice what="Cloud cover forecast" horizon="16 days from today" />}
+        {(weatherStale && isNowPreview) && <OutOfRangeNotice what="Cloud cover forecast" horizon="16 days from today" />}
       </div>
 
       {kpForecast && kpForecast.length > 0 && (
         <Aurora3DayChart
           kpForecast={kpForecast}
-          now={now ?? new Date()}
-          offsetHours={offsetHours}
-          setOffsetHours={setOffsetHours}
+          now={nowDate}
+          previewTime={previewTime}
+          setPreviewTime={setPreviewTime}
           maxHours={MAX_HOURS}
         />
       )}
@@ -323,19 +321,18 @@ function LiveView({ aurora, weather, bortle, sky, coords, now, weatherStale, bor
    in the next 3 days. The user's location is pinned (clicks suppressed)
    so they can see the oval shift relative to where they actually are. */
 function Aurora3DayMap({ coords, weather, aurora, bortleAuto, kpForecast, now, mapOverlays, setMapOverlays }) {
-  const [offsetHours, setOffsetHours] = useState(0);
+  const [previewTime, setPreviewTime] = useState(null);
   const tzName = weather?.timezone ?? null;
-  const previewTime = useMemo(
-    () => new Date((now ?? new Date()).getTime() + offsetHours * 3600000),
-    [now, offsetHours]
-  );
+  const nowDate = now ?? new Date();
+  const isNowPreview = previewTime == null;
+  const effectivePreview = isNowPreview ? nowDate : previewTime;
   // Override Kp with the previewed-time Kp so the oval intensity colour
   // shifts with the slider.
   const previewKp = useMemo(() => {
-    if (offsetHours === 0) return aurora?.kp;
-    const b = kpAt(kpForecast, previewTime.getTime());
+    if (isNowPreview) return aurora?.kp;
+    const b = kpAt(kpForecast, effectivePreview.getTime());
     return b ? b.kp : aurora?.kp;
-  }, [aurora, kpForecast, previewTime, offsetHours]);
+  }, [aurora, kpForecast, effectivePreview, isNowPreview]);
 
   const syntheticAurora = useMemo(
     () => aurora ? { ...aurora, kp: previewKp } : null,
@@ -357,9 +354,9 @@ function Aurora3DayMap({ coords, weather, aurora, bortleAuto, kpForecast, now, m
         <div className="mono text-xs subtle">Slide to see how the oval moves; pin = your location</div>
       </div>
       <TimeOffsetSlider
-        now={now ?? new Date()}
-        offsetHours={offsetHours}
-        setOffsetHours={setOffsetHours}
+        now={nowDate}
+        previewTime={previewTime}
+        setPreviewTime={setPreviewTime}
         maxHours={MAX_HOURS}
         tzName={tzName}
         label="Map time"
@@ -370,7 +367,7 @@ function Aurora3DayMap({ coords, weather, aurora, bortleAuto, kpForecast, now, m
         weather={weather}
         aurora={syntheticAurora}
         bortleAuto={bortleAuto}
-        now={previewTime}
+        now={effectivePreview}
         overlays={auroraMapOverlays}
         setOverlays={setMapOverlays}
       />
@@ -666,7 +663,7 @@ function ViewingLatDiagram({ kp, userGeoLat, threshold }) {
 
 /* 72-hour Kp forecast spark with a draggable cursor. Click or drag
    anywhere on the chart to set the slider. */
-function Aurora3DayChart({ kpForecast, now, offsetHours, setOffsetHours, maxHours }) {
+function Aurora3DayChart({ kpForecast, now, previewTime, setPreviewTime, maxHours }) {
   const hourly = useMemo(() => {
     if (!kpForecast || !kpForecast.length) return [];
     const out = [];
@@ -687,7 +684,22 @@ function Aurora3DayChart({ kpForecast, now, offsetHours, setOffsetHours, maxHour
   }, [kpForecast, now, maxHours]);
 
   if (!hourly.length) return null;
-  const cursorIdx = Math.min(offsetHours, hourly.length - 1);
+  // Find the hourly bucket nearest to the current previewTime; if no preview,
+  // point the cursor at "now" (which sits between bucket 0 and 1).
+  const target = (previewTime ?? now).getTime();
+  let cursorIdx = 0, bestD = Infinity;
+  for (let i = 0; i < hourly.length; i++) {
+    const d = Math.abs(hourly[i].t.getTime() - target);
+    if (d < bestD) { bestD = d; cursorIdx = i; }
+  }
+
+  const onScrub = (idx) => {
+    if (!setPreviewTime) return;
+    const i = Math.max(0, Math.min(hourly.length - 1, idx));
+    // Idx 0 corresponds to "this hour" — close enough to NOW that we route
+    // through the null sentinel so the live clock advances naturally.
+    setPreviewTime(i === 0 ? null : hourly[i].t);
+  };
 
   return (
     <div className="panel corner p-6">
@@ -698,7 +710,7 @@ function Aurora3DayChart({ kpForecast, now, offsetHours, setOffsetHours, maxHour
       <KpForecastSpark
         forecast={hourly}
         idx={cursorIdx}
-        onScrub={(idx) => setOffsetHours?.(idx)}
+        onScrub={onScrub}
         maxHours={maxHours}
       />
       <div className="mono text-xs flex justify-between mt-1 secondary">

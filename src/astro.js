@@ -309,9 +309,22 @@ export function subsolarPoint(date) {
    as arrays of { lat, lon, day } where `day` is true on the sunlit side
    (aurora invisible). Resolution is one sample per 5° MLT. */
 export function auroralOvalRings(kp, date) {
-  const baseEq = KP_VIEW_LAT[Math.floor(clamp(kp, 0, 9))] ?? 50;
+  // Linear interpolation between integer Kp thresholds — the oval glides
+  // smoothly as Kp ticks fractionally instead of jumping at each integer.
+  const kpClamped = clamp(kp, 0, 9);
+  const k0 = Math.floor(kpClamped);
+  const k1 = Math.min(9, k0 + 1);
+  const f = kpClamped - k0;
+  const baseEq = (KP_VIEW_LAT[k0] ?? 50) * (1 - f) + (KP_VIEW_LAT[k1] ?? 50) * f;
   const sub = subsolarPoint(date);
   const subMag = geographicToGeomagnetic(sub.lat, sub.lon);
+
+  // Midnight-dip asymmetry: tuned so the nightside equatorward edge lands
+  // within ~1° of NOAA's published Kp→viewing-latitude table across Kp 0–9.
+  // The previous 3° dip was overdoing it at moderate-high Kp.
+  const NIGHT_DIP_DEG = 1.5;
+  const WIDTH_BASE_DEG = 5;          // band width at noon
+  const WIDTH_NIGHT_BONUS_DEG = 2.0; // extra width at midnight (was 3)
 
   const samples = [];
   // MLT from 0 (magnetic midnight) to 24 in 5° magnetic-longitude steps
@@ -321,8 +334,8 @@ export function auroralOvalRings(kp, date) {
     const mLon = ((subMag.lon + dLon + 540) % 360) - 180;
     // Asymmetry term: 0 at noon (dLon=0), 1 at midnight (|dLon|=180).
     const a = (1 - Math.cos(dLon * DEG)) / 2;
-    const eqLat = baseEq - 3 * a;             // equatorward dip
-    const poleLat = eqLat + 5 + 3 * a;        // wider on the nightside
+    const eqLat = baseEq - NIGHT_DIP_DEG * a;
+    const poleLat = eqLat + WIDTH_BASE_DEG + WIDTH_NIGHT_BONUS_DEG * a;
     samples.push({ mLon, eqLat, poleLat, midnightFraction: a });
   }
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { THEMES } from "../theme.js";
 
 export function DataCell({ label, value, sub }) {
@@ -93,34 +93,82 @@ export function ScoreDial({ score, label = "/ 100" }) {
    header strip — labels show NOW vs the previewed local time at the
    user's location. `tzName` is optional; when provided, the previewed
    time renders in that timezone instead of the browser's. */
-export function TimeOffsetSlider({ now, offsetHours, setOffsetHours, maxHours, tzName, label = "Forecast Time" }) {
-  const previewTime = new Date(now.getTime() + offsetHours * 3600000);
+/* Slider whose first stop is "now" (e.g. 12:48) and every subsequent stop
+   snaps to the next 15-minute clock boundary (1:00, 1:15, 1:30, …) out to
+   `maxHours` ahead. Callers store either null (= now) or an absolute Date
+   in `previewTime`; the slider maps that to a slot index internally and
+   the parent always gets a concrete instant to render. */
+export function TimeOffsetSlider({ now, previewTime, setPreviewTime, maxHours, tzName, label = "Forecast Time" }) {
+  // Recompute slots whenever a new clock-minute lands, but ONLY structurally
+  // (count + first/last visible label changes once per hour). Listing key by
+  // current hour keeps the array reference stable for sub-hour ticks.
+  const nowMs = now.getTime();
+  const hourKey = Math.floor(nowMs / 3600000);
+  const slots = useMemo(() => {
+    const out = [now];
+    const next = new Date(now);
+    next.setMinutes(0, 0, 0);
+    next.setHours(next.getHours() + 1);
+    const cutoffMs = nowMs + maxHours * 3600000;
+    let t = next;
+    while (t.getTime() <= cutoffMs) {
+      out.push(t);
+      t = new Date(t.getTime() + 15 * 60000);
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hourKey, maxHours]);
+
+  // Map current preview to a slot index. previewTime null/now → slot 0;
+  // otherwise pick the slot closest in time.
+  const idx = useMemo(() => {
+    if (!previewTime) return 0;
+    const target = previewTime.getTime();
+    let best = 0, bestD = Infinity;
+    for (let i = 0; i < slots.length; i++) {
+      const d = Math.abs(slots[i].getTime() - target);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+  }, [previewTime, slots]);
+
   const fmt = (d, opts) =>
     tzName ? d.toLocaleString([], { ...opts, timeZone: tzName })
            : d.toLocaleString([], opts);
-  const labelFor = (h) => {
-    if (h === 0) return "NOW";
-    const d = new Date(now.getTime() + h * 3600000);
-    return fmt(d, { weekday: "short", hour: "2-digit", minute: "2-digit" }).toUpperCase();
+  const labelFor = (i) => {
+    if (i === 0) return `NOW · ${fmt(slots[0], { hour: "2-digit", minute: "2-digit" })}`;
+    return fmt(slots[i], { weekday: "short", hour: "2-digit", minute: "2-digit" }).toUpperCase();
   };
+
+  const onChange = (e) => {
+    const i = parseInt(e.target.value);
+    setPreviewTime(i === 0 ? null : slots[i]);
+  };
+  const onNow = () => setPreviewTime(null);
+
+  const isNow = idx === 0;
+  const offsetMs = isNow ? 0 : slots[idx].getTime() - nowMs;
+  const offsetH = offsetMs / 3600000;
+  const offsetLabel = isNow
+    ? null
+    : offsetH < 1 ? `+${Math.round(offsetMs / 60000)}m`
+    : offsetH < 24 ? `+${offsetH.toFixed(2)}h`
+    : `+${Math.floor(offsetH / 24)}d ${Math.round(offsetH % 24)}h`;
+
   const days = Math.floor(maxHours / 24);
   return (
     <div className="frame p-3 mb-3">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
         <div className="flex items-center gap-2">
           <span className="mono text-xs uppercase tracking-widest muted">{label}</span>
-          <span className="display gold text-sm">{labelFor(offsetHours)}</span>
-          {offsetHours > 0 && (
-            <span className="mono text-xs subtle">
-              +{offsetHours < 24 ? `${offsetHours}h` : `${Math.floor(offsetHours / 24)}d ${offsetHours % 24}h`}
-            </span>
-          )}
+          <span className="display gold text-sm">{labelFor(idx)}</span>
+          {offsetLabel && <span className="mono text-xs subtle">{offsetLabel}</span>}
         </div>
         <button
           className="ghost"
-          onClick={() => setOffsetHours(0)}
-          disabled={offsetHours === 0}
-          style={{ fontSize: "0.65rem", padding: "0.25rem 0.6rem", opacity: offsetHours === 0 ? 0.4 : 1 }}
+          onClick={onNow}
+          disabled={isNow}
+          style={{ fontSize: "0.65rem", padding: "0.25rem 0.6rem", opacity: isNow ? 0.4 : 1 }}
         >
           NOW
         </button>
@@ -128,10 +176,10 @@ export function TimeOffsetSlider({ now, offsetHours, setOffsetHours, maxHours, t
       <input
         type="range"
         min={0}
-        max={maxHours}
+        max={Math.max(0, slots.length - 1)}
         step={1}
-        value={offsetHours}
-        onChange={(e) => setOffsetHours(parseInt(e.target.value))}
+        value={idx}
+        onChange={onChange}
         style={{ width: "100%" }}
       />
       <div className="mono text-xs flex justify-between mt-1 subtle">

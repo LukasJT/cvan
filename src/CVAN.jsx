@@ -16,6 +16,7 @@ import { MoonSun } from "./components/MoonSun.jsx";
 import { Planner } from "./components/Planner.jsx";
 import { KpForecast } from "./components/KpForecast.jsx";
 import { Sources } from "./components/Sources.jsx";
+import { FAQ } from "./components/FAQ.jsx";
 import { Solar } from "./components/Solar.jsx";
 
 const WEATHER_HORIZON_DAYS = 16;
@@ -384,7 +385,7 @@ export default function CVAN() {
 
         {/* CONTENT */}
         <div ref={contentRef} style={{ scrollMarginTop: "12px" }} />
-        {!coords && tab !== "sources" && tab !== "solar" ? (
+        {!coords && tab !== "sources" && tab !== "solar" && tab !== "faq" ? (
           <div className="panel corner p-12 text-center">
             <div className="display gold text-lg mb-3">AWAITING POSITION FIX</div>
             <p className="body text-base secondary">
@@ -452,6 +453,7 @@ export default function CVAN() {
               <Planner coords={coords} weather={weather} weatherStale={!weather} bortle={bortle} />
             )}
             {tab === "sources" && <Sources />}
+            {tab === "faq" && <FAQ />}
           </>
         )}
 
@@ -517,6 +519,8 @@ const PRIMARY_TABS = [
 const DETAIL_TABS = [
   ["kpforecast", "Kp Forecast"],
   ["moonsun", "Moon & Sun"],
+  ["faq", "FAQ"],
+  ["sources", "Sources"],
 ];
 function TabNav({ tab, setTab }) {
   const [openDetails, setOpenDetails] = useState(false);

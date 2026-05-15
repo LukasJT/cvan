@@ -11,23 +11,26 @@ const MAX_HOURS = 7 * 24; // one week
 
 export function MilkyWay({ sky, weather, bortle, bortleAuto, curve, coords, now, weatherStale }) {
   if (!sky) return null;
-  const [offsetHours, setOffsetHours] = useState(0);
+  // `previewTime` is null when previewing "now"; a Date when the user has
+  // dragged the slider to a specific 15-min slot. Storing absolute time
+  // (not an offset) means the selected slot stays fixed while the live
+  // clock ticks past it.
+  const [previewTime, setPreviewTime] = useState(null);
   const tzName = weather?.timezone ?? null;
+  const nowDate = now ?? new Date();
+  const isNowPreview = previewTime == null;
+  const effectivePreview = isNowPreview ? nowDate : previewTime;
+  const offsetHours = isNowPreview ? 0 : (effectivePreview.getTime() - nowDate.getTime()) / 3600000;
 
-  // Preview-time derived values (sky, cloud) used by the conditions panel.
-  const previewTime = useMemo(
-    () => new Date((now ?? new Date()).getTime() + offsetHours * 3600000),
-    [now, offsetHours]
-  );
   const previewSky = useMemo(
-    () => offsetHours === 0 ? sky : computeSky(previewTime, coords),
-    [sky, previewTime, coords, offsetHours]
+    () => isNowPreview ? sky : computeSky(effectivePreview, coords),
+    [sky, effectivePreview, coords, isNowPreview]
   );
   const previewCloud = useMemo(() => {
-    if (offsetHours === 0) return weatherStale ? null : weather?.current?.cloud_cover ?? null;
-    return cloudCoverAt(weather, previewTime.getTime());
-  }, [offsetHours, previewTime, weather, weatherStale]);
-  const previewCloudOutOfRange = offsetHours > 0 && previewCloud == null;
+    if (isNowPreview) return weatherStale ? null : weather?.current?.cloud_cover ?? null;
+    return cloudCoverAt(weather, effectivePreview.getTime());
+  }, [isNowPreview, effectivePreview, weather, weatherStale]);
+  const previewCloudOutOfRange = !isNowPreview && previewCloud == null;
 
   // The Right-Now panel and overall verdict stay anchored to the actual now,
   // so the headline assessment doesn't change as you drag the slider.
@@ -94,12 +97,12 @@ export function MilkyWay({ sky, weather, bortle, bortleAuto, curve, coords, now,
 
       <div className="panel corner p-6">
         <div className="mono text-xs uppercase tracking-widest mb-3 muted">
-          Conditions Affecting {offsetHours === 0 ? "Tonight's View" : "Previewed View"}
+          Conditions Affecting {isNowPreview ? "Tonight's View" : "Previewed View"}
         </div>
         <TimeOffsetSlider
-          now={now ?? new Date()}
-          offsetHours={offsetHours}
-          setOffsetHours={setOffsetHours}
+          now={nowDate}
+          previewTime={previewTime}
+          setPreviewTime={setPreviewTime}
           maxHours={MAX_HOURS}
           tzName={tzName}
           label="View at"
@@ -116,11 +119,11 @@ export function MilkyWay({ sky, weather, bortle, bortleAuto, curve, coords, now,
             note={`${previewSky.tw.name} — sun at ${fmtDeg(previewSky.sunHz.alt)}. Galactic core requires astronomical night (sun < −18°) for full contrast.`} />
           <FactorRow
             label="Cloud cover"
-            status={previewCloudOutOfRange || (offsetHours === 0 && weatherStale) ? "unknown" : previewCloud == null ? "unknown" : previewCloud < 30 ? "good" : previewCloud < 60 ? "fair" : "bad"}
+            status={previewCloudOutOfRange || (isNowPreview && weatherStale) ? "unknown" : previewCloud == null ? "unknown" : previewCloud < 30 ? "good" : previewCloud < 60 ? "fair" : "bad"}
             note={
               previewCloudOutOfRange
                 ? "Beyond 16-day Open-Meteo forecast — cloud cover not factored into score."
-                : (offsetHours === 0 && weatherStale)
+                : (isNowPreview && weatherStale)
                   ? "Out of weather forecast range — cloud cover not factored into score."
                   : previewCloud != null
                     ? `${previewCloud}% — ${cloudVerdict(previewCloud)}`
@@ -129,7 +132,7 @@ export function MilkyWay({ sky, weather, bortle, bortleAuto, curve, coords, now,
           <FactorRow label="Galactic core altitude" status={previewSky.coreHz.alt > 30 ? "good" : previewSky.coreHz.alt > 10 ? "fair" : "bad"}
             note={`Core at ${fmtDeg(previewSky.coreHz.alt)} altitude, ${fmtDeg(previewSky.coreHz.az)} azimuth (${azimuthName(previewSky.coreHz.az)}). Higher altitude = thinner atmosphere = more contrast. Best viewing >30°.`} />
         </div>
-        {(weatherStale && offsetHours === 0) && <OutOfRangeNotice what="Cloud cover forecast" horizon="16 days from today" />}
+        {(weatherStale && isNowPreview) && <OutOfRangeNotice what="Cloud cover forecast" horizon="16 days from today" />}
       </div>
 
       <MilkyWayNightChart coords={coords} now={now ?? new Date()} tzName={tzName} />
