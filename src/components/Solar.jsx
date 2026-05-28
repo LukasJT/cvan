@@ -25,12 +25,22 @@ export function Solar() {
   return (
     <div className="space-y-6">
       <div className="panel corner p-6">
-        <div className="mono text-xs uppercase tracking-widest mb-2 muted">Live Sun · NOAA SWPC + GOES SUVI / SOHO LASCO / SDO HMI</div>
+        <div className="mono text-xs uppercase tracking-widest mb-2 muted">Live Sun · NOAA SWPC Space Weather Enthusiasts Dashboard</div>
         <div className="body text-sm secondary">
-          Real-time solar imagery and data, refreshed at the same cadence NOAA publishes them.
-          Click any image to play the most recent ~24 h as an animation; click again to pause and return to the live frame.
+          Real-time solar imagery, refreshed at the cadence NOAA publishes each product.
+          Click any image with a <span className="gold mono" style={{ fontSize: "0.75em" }}>▶ click to play</span> badge to cycle through the most recent ~24 h as a video; click again to return to the live frame.
         </div>
       </div>
+
+      {/* SWPC ENTHUSIAST DASHBOARD COMPOSITE — the big overview gif */}
+      <SolarCard
+        title="SWPC Enthusiast Dashboard · Overview"
+        sub="NOAA's composite snapshot: Kp, GOES X-ray, solar wind, aurora forecast, GOES SUVI 195, LASCO C3 — all on one chart"
+        stillUrl={`${SWPC}/images/swx-overview-large.gif`}
+        refreshSeconds={300}
+        stillKind="gif"
+        wide
+      />
 
       {/* HERO: SUVI 304 — the most striking + most aurora-relevant view */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -49,6 +59,7 @@ export function Solar() {
             title="SDO HMI · Visible (continuum)"
             sub="Solar photosphere — sunspot positions"
             stillUrl={`${SWPC}/images/animations/sdo-hmii/latest.jpg`}
+            animationId="sdo-hmii"
             refreshSeconds={720}
             stillKind="jpg"
           />
@@ -73,25 +84,36 @@ export function Solar() {
         </div>
       </div>
 
-      {/* LASCO + ENLIL (CME / heliospheric) */}
+      {/* LASCO coronagraphs (CME hunt) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SolarCard
-          title="LASCO C3 · Coronagraph"
-          sub="SOHO C3 — sees CMEs erupting from the Sun out to 32 R⊙"
+          title="LASCO C2 · Inner Coronagraph"
+          sub="SOHO C2 — inner corona out to 6 R⊙, best for early CME detection"
+          stillUrl={`${SWPC}/images/animations/lasco-c2/latest.jpg`}
+          animationId="lasco-c2"
+          refreshSeconds={720}
+          stillKind="jpg"
+        />
+        <SolarCard
+          title="LASCO C3 · Outer Coronagraph"
+          sub="SOHO C3 — CMEs travelling out to 32 R⊙ toward Earth"
           stillUrl={`${SWPC}/images/animations/lasco-c3/latest.jpg`}
           animationId="lasco-c3"
           refreshSeconds={720}
           stillKind="jpg"
         />
-        <SolarCard
-          title="WSA-ENLIL · Solar Wind Prediction"
-          sub="Heliospheric model — Earth (yellow disk) inside the predicted solar wind"
-          stillUrl={`${SWPC}/images/animations/enlil/latest.jpg`}
-          animationId="enlil"
-          refreshSeconds={6 * 3600}
-          stillKind="jpg"
-        />
       </div>
+
+      {/* ENLIL (heliospheric solar wind model) */}
+      <SolarCard
+        title="WSA-ENLIL · Solar Wind Prediction"
+        sub="Heliospheric model — Earth (yellow disk) inside the predicted solar wind, showing CME arrival"
+        stillUrl={`${SWPC}/images/animations/enlil/latest.jpg`}
+        animationId="enlil"
+        refreshSeconds={6 * 3600}
+        stillKind="jpg"
+        wide
+      />
 
       {/* ACE 24-hour magnetometer + SWEPAM combined chart from NOAA */}
       <SolarCard
@@ -103,12 +125,13 @@ export function Solar() {
         wide
       />
 
-      {/* OVATION aurora forecast */}
+      {/* OVATION aurora forecast — now playable */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SolarCard
           title="OVATION · Aurora Forecast (North)"
           sub="30-minute aurora intensity forecast over the northern hemisphere"
           stillUrl={`${SWPC}/images/animations/ovation/north/latest.jpg`}
+          animationId="ovation_north_24h"
           refreshSeconds={300}
           stillKind="jpg"
         />
@@ -116,8 +139,44 @@ export function Solar() {
           title="OVATION · Aurora Forecast (South)"
           sub="30-minute aurora intensity forecast over the southern hemisphere"
           stillUrl={`${SWPC}/images/animations/ovation/south/latest.jpg`}
+          animationId="ovation_south_24h"
           refreshSeconds={300}
           stillKind="jpg"
+        />
+      </div>
+
+      {/* Earth impacts: D-RAP + GloTEC (HF radio absorption + ionosphere TEC) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SolarCard
+          title="D-RAP · HF Radio Blackouts"
+          sub="D-Region Absorption Predictor — global map of solar flare radio impact"
+          stillUrl={`${SWPC}/images/animations/d-rap/global/latest.png`}
+          animationId="d-rap/global"
+          refreshSeconds={300}
+        />
+        <SolarCard
+          title="GloTEC · Total Electron Content"
+          sub="Global ionosphere TEC — drives GPS error during storms"
+          stillUrl={`${SWPC}/images/animations/glotec/100cus_urt/latest.png`}
+          animationId="glotec/100cus_urt"
+          refreshSeconds={900}
+        />
+      </div>
+
+      {/* Notifications timeline + Aurora forecast still */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SolarCard
+          title="Aurora Forecast · Northern Hemisphere"
+          sub="Short-term forecast snapshot at the user's chosen time"
+          stillUrl={`${SWPC}/images/aurora-forecast-northern-hemisphere.jpg`}
+          refreshSeconds={1800}
+          stillKind="jpg"
+        />
+        <SolarCard
+          title="SWPC Notifications · Recent Timeline"
+          sub="Active alerts, watches, warnings issued by NOAA SWPC"
+          stillUrl={`${SWPC}/images/notifications-timeline.png`}
+          refreshSeconds={600}
         />
       </div>
 
