@@ -278,19 +278,20 @@ function TimeZoneRow({ displayTz, setDisplayTz }) {
           onChange={(e) => setDisplayTz(e.target.value)}
           style={{
             width: "100%",
-            padding: "0.35rem 0.5rem",
-            background: "var(--strip-bg)",
-            border: "1px solid var(--frame-border)",
-            color: "var(--accent-gold)",
+            padding: "0.4rem 0.5rem",
+            background: "#0a1428",
+            border: "1px solid var(--accent-gold)",
+            color: "#ffffff",
             borderRadius: 2,
             fontFamily: "JetBrains Mono, monospace",
-            fontSize: "0.7rem",
+            fontSize: "0.75rem",
             cursor: "pointer",
+            colorScheme: "dark",
           }}
         >
-          {zoneList.length === 0 && <option value={customValue}>{customValue || "(loading…)"}</option>}
+          {zoneList.length === 0 && <option value={customValue} style={{ background: "#0a1428", color: "#ffffff" }}>{customValue || "(loading…)"}</option>}
           {zoneList.map((z) => (
-            <option key={z} value={z}>{z}</option>
+            <option key={z} value={z} style={{ background: "#0a1428", color: "#ffffff" }}>{z}</option>
           ))}
         </select>
       )}
