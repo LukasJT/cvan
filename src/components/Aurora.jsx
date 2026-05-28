@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   fmtDeg, fmtTime, KP_VIEW_LAT, geomagneticLatitude, DEG, moonPhaseName,
-  computeSky, cloudCoverAt, kpAt, parseLocationTime,
+  computeSky, cloudCoverAt, kpAt, parseLocationTime, fmtTimeTz,
 } from "../astro.js";
 import { DataCell, FactorRow, OutOfRangeNotice, TimeOffsetSlider } from "./shared.jsx";
 import { MapPanel } from "./MapPicker.jsx";
@@ -11,7 +11,7 @@ const MAX_HOURS = 72; // three days
 
 export function Aurora({
   aurora, weather, bortle, sky, coords, kpForecast, now, weatherStale,
-  bortleAuto, mapOverlays, setMapOverlays, onPickCoords,
+  bortleAuto, mapOverlays, setMapOverlays, onPickCoords, displayTz,
 }) {
   if (!aurora) {
     return (
@@ -31,12 +31,14 @@ export function Aurora({
         <ForecastView
           aurora={aurora} weather={weather} bortle={bortle} sky={sky}
           coords={coords} kpForecast={kpForecast} now={now} weatherStale={weatherStale}
+          displayTz={displayTz}
         />
       ) : (
         <LiveView
           aurora={aurora} weather={weather} bortle={bortle} sky={sky}
           coords={coords} now={now} weatherStale={weatherStale}
           bortleAuto={bortleAuto}
+          displayTz={displayTz}
         />
       )}
       <Aurora3DayMap
@@ -86,7 +88,7 @@ function ModeToggle({ mode, setMode }) {
 
 /* ============================================================== FORECAST VIEW
    Long-term planning: viewing geometry, conditions panel, 3-day Kp spark. */
-function ForecastView({ aurora, weather, bortle, sky, coords, kpForecast, now, weatherStale }) {
+function ForecastView({ aurora, weather, bortle, sky, coords, kpForecast, now, weatherStale, displayTz }) {
   const [previewTime, setPreviewTime] = useState(null);
   const tzName = weather?.timezone ?? null;
   const nowDate = now ?? new Date();
@@ -128,7 +130,7 @@ function ForecastView({ aurora, weather, bortle, sky, coords, kpForecast, now, w
           <div className="mono text-xs uppercase tracking-widest mb-3 muted">NOAA Planetary Kp</div>
           <KpDial kp={aurora.kp} />
           <div className="mono text-xs text-center mt-2 muted">
-            updated {new Date(aurora.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            updated {fmtTimeTz(aurora.time instanceof Date ? aurora.time : new Date(aurora.time), displayTz)}
           </div>
         </div>
 
@@ -209,7 +211,7 @@ function ForecastView({ aurora, weather, bortle, sky, coords, kpForecast, now, w
    solar wind plasma + magnetic-field data from NOAA SWPC, refreshes
    every minute, and surfaces the aurora-relevant numbers (Bz, wind
    speed/density, IMF Bt). Plus tonight's viewing-conditions readout. */
-function LiveView({ aurora, weather, bortle, sky, coords, now, weatherStale, bortleAuto }) {
+function LiveView({ aurora, weather, bortle, sky, coords, now, weatherStale, bortleAuto, displayTz }) {
   const plasma = useNoaaProductSeries("plasma");
   const mag = useNoaaProductSeries("mag");
 
@@ -244,7 +246,7 @@ function LiveView({ aurora, weather, bortle, sky, coords, now, weatherStale, bor
           <div className="mono text-xs uppercase tracking-widest mb-2 muted">Live Kp · 1-min</div>
           <BigNumber value={aurora.kp.toFixed(1)} unit="Kp" color={kpColor(aurora.kp)} />
           <div className="mono text-xs mt-2 muted">
-            updated {new Date(aurora.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            updated {fmtTimeTz(aurora.time instanceof Date ? aurora.time : new Date(aurora.time), displayTz)}
           </div>
         </div>
         <div className="panel corner p-6 text-center">

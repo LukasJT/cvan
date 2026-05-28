@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   sunPosition, moonPosition, computeSky, fmtTime,
   altitudeCurve, compositeScore, findEvents,
+  parseUtcTimeTag,
 } from "./astro.js";
 import { fetchLightPollutionAt } from "./lightPollution.js";
 import { applyTheme, loadTheme } from "./theme.js";
@@ -46,6 +47,14 @@ export default function CVAN() {
   const [mapOpen, setMapOpen] = useState(false);
   const [mapOverlays, setMapOverlays] = useState({ clouds: false, auroralOval: false, lightPollution: false });
   const [theme, setTheme] = useState(() => loadTheme());
+  const [displayTz, setDisplayTzState] = useState(() => {
+    try { return localStorage.getItem("cvan-display-tz") || "local"; }
+    catch { return "local"; }
+  });
+  const setDisplayTz = (v) => {
+    setDisplayTzState(v);
+    try { localStorage.setItem("cvan-display-tz", v); } catch {/* ignore */}
+  };
   const contentRef = useRef(null);
 
   // Switch tab + scroll the content area into view so the user can see
@@ -156,7 +165,9 @@ export default function CVAN() {
           if (Number.isFinite(v)) { kp = v; time = data[i].time_tag; break; }
         }
         if (kp == null) { setAurora(null); return; }
-        setAurora({ kp, time });
+        // NOAA time_tag is UTC but uses a space separator that JS treats as
+        // local — parse explicitly so .toLocaleTimeString() converts correctly.
+        setAurora({ kp, time: parseUtcTimeTag(time) });
         setLastUpdated((u) => ({ ...u, aurora: new Date() }));
       })
       .catch(() => setAurora(null));
@@ -315,6 +326,8 @@ export default function CVAN() {
                 <SettingsCog
                   theme={theme}
                   setTheme={setTheme}
+                  displayTz={displayTz}
+                  setDisplayTz={setDisplayTz}
                   onOpenInfo={() => goToTab("sources")}
                 />
                 <Insignia />
@@ -431,6 +444,7 @@ export default function CVAN() {
                 bortleAuto={bortleAuto}
                 mapOverlays={mapOverlays}
                 setMapOverlays={setMapOverlays}
+                displayTz={displayTz}
                 onPickCoords={(lat, lon) => setCoords({ lat, lon, label: `${lat.toFixed(4)}, ${lon.toFixed(4)} (map)` })}
               />
             )}

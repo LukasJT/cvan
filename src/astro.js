@@ -441,6 +441,50 @@ export const fmtTime = (d) => {
   if (!d) return "—";
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 };
+
+/* NOAA SWPC's time_tag strings are UTC but the format ("YYYY-MM-DD HH:MM:SS"
+   with a space instead of T, no Z suffix) makes JavaScript's Date parser
+   treat them as LOCAL by default. Parse explicitly as UTC. */
+export function parseUtcTimeTag(s) {
+  if (!s) return null;
+  if (s instanceof Date) return s;
+  // Accept both "YYYY-MM-DD HH:MM:SS" and "YYYY-MM-DDTHH:MM:SS"
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/);
+  if (!m) {
+    // Fall back to the native parser (handles strings with explicit Z / offset).
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
+}
+
+/* Short timezone abbreviation for a Date as the user's browser sees it
+   ("EDT", "PST", "UTC", etc). Falls back to the GMT offset for browsers
+   that don't return a name. */
+export function tzAbbrev(d) {
+  if (!d) return "";
+  try {
+    const parts = new Intl.DateTimeFormat([], { timeZoneName: "short" }).formatToParts(d);
+    const tz = parts.find(p => p.type === "timeZoneName");
+    if (tz && tz.value) return tz.value;
+  } catch {/* fall through */}
+  const offMin = -d.getTimezoneOffset();
+  const sign = offMin >= 0 ? "+" : "-";
+  const ah = Math.floor(Math.abs(offMin) / 60).toString().padStart(2, "0");
+  const am = (Math.abs(offMin) % 60).toString().padStart(2, "0");
+  return `UTC${sign}${ah}:${am}`;
+}
+
+/* Format a time honoring the user's display-tz preference. */
+export function fmtTimeTz(d, displayTz) {
+  if (!d) return "—";
+  if (displayTz === "utc") {
+    return d.toLocaleTimeString([], {
+      hour: "2-digit", minute: "2-digit", timeZone: "UTC", hour12: false,
+    }) + " UTC";
+  }
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + " " + tzAbbrev(d);
+}
 export const fmtDeg = (n, p = 1) => `${n.toFixed(p)}°`;
 
 export function azimuthName(az) {

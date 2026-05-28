@@ -208,7 +208,7 @@ export function OutOfRangeNotice({ what, horizon }) {
    contains a small "Theme" cog (opens a sub-popover with the swatches)
    and an "i" info button at the bottom that routes to the in-app
    citations / About page. */
-export function SettingsCog({ theme, setTheme, onOpenInfo }) {
+export function SettingsCog({ theme, setTheme, displayTz, setDisplayTz, onOpenInfo }) {
   const [open, setOpen] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
   const popoverRef = useRef(null);
@@ -314,6 +314,48 @@ export function SettingsCog({ theme, setTheme, onOpenInfo }) {
               ))}
               <div className="mono subtle mt-1" style={{ fontSize: "0.62rem" }}>
                 Red mode preserves dark adaptation for field use.
+              </div>
+            </div>
+          )}
+
+          {/* Time zone — switches NOAA-sourced time displays between the user's local clock and UTC. */}
+          {setDisplayTz && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.6rem",
+                width: "100%",
+                marginTop: "0.6rem",
+                padding: "0.5rem",
+                border: "1px solid var(--frame-border)",
+                borderRadius: 2,
+              }}
+            >
+              <span className="display gold" style={{ fontSize: "0.78rem" }}>Time zone</span>
+              <div style={{ display: "flex", marginLeft: "auto", gap: 4 }}>
+                {["local", "utc"].map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => setDisplayTz(v)}
+                    className="ghost"
+                    style={{
+                      padding: "0.25rem 0.55rem",
+                      border: "1px solid",
+                      borderColor: displayTz === v ? "var(--accent-gold)" : "var(--frame-border)",
+                      background: displayTz === v ? "var(--strip-bg)" : "transparent",
+                      color: displayTz === v ? "var(--accent-gold)" : "var(--text-muted)",
+                      cursor: "pointer",
+                      borderRadius: 2,
+                      fontFamily: "JetBrains Mono, monospace",
+                      fontSize: "0.62rem",
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {v === "local" ? "Local" : "UTC"}
+                  </button>
+                ))}
               </div>
             </div>
           )}
