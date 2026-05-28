@@ -508,11 +508,11 @@ function CogIcon({ spinning, small }) {
 export function Insignia() {
   return (
     <img
-      src={`${import.meta.env.BASE_URL}logo.png`}
+      src={`${import.meta.env.BASE_URL}logo-header.png`}
       alt="CVAN insignia"
       width="56"
       height="56"
-      style={{ display: "block", borderRadius: "50%" }}
+      style={{ display: "block" }}
     />
   );
 }
