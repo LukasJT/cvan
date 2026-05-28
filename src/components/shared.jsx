@@ -411,22 +411,12 @@ function CogIcon({ spinning, small }) {
 
 export function Insignia() {
   return (
-    <svg width="56" height="56" viewBox="0 0 56 56">
-      <defs>
-        <radialGradient id="cvan-insig-sky" cx="50%" cy="50%">
-          <stop offset="0%" stopColor="var(--bg-grad-from)" />
-          <stop offset="100%" stopColor="var(--bg-base)" />
-        </radialGradient>
-      </defs>
-      <circle cx="28" cy="28" r="26" fill="url(#cvan-insig-sky)" stroke="var(--accent-gold)" strokeWidth="1.5" />
-      <circle cx="28" cy="28" r="22" fill="none" stroke="var(--bg-grad-from)" strokeWidth="2" />
-      <path d="M 8 32 Q 14 18 20 30 Q 26 14 32 28 Q 40 12 48 30" fill="none" stroke="var(--accent-green)" strokeWidth="1.2" opacity="0.7" />
-      <path d="M 10 36 Q 18 24 24 34 Q 32 20 40 32 Q 46 22 50 34" fill="none" stroke="var(--accent-purple)" strokeWidth="1" opacity="0.5" />
-      <circle cx="28" cy="22" r="1.4" fill="var(--star-color)" />
-      <circle cx="20" cy="18" r="0.8" fill="var(--star-color)" />
-      <circle cx="36" cy="20" r="0.8" fill="var(--star-color)" />
-      <circle cx="42" cy="26" r="0.6" fill="var(--star-color)" />
-      <path d="M 8 42 L 20 38 L 28 42 L 36 38 L 48 42 L 48 50 L 8 50 Z" fill="var(--bg-base)" stroke="var(--bg-grad-from)" />
-    </svg>
+    <img
+      src={`${import.meta.env.BASE_URL}logo.png`}
+      alt="CVAN insignia"
+      width="56"
+      height="56"
+      style={{ display: "block", borderRadius: "50%" }}
+    />
   );
 }
