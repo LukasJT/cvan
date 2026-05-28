@@ -458,16 +458,19 @@ export function parseUtcTimeTag(s) {
   return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
 }
 
-/* Short timezone abbreviation for a Date as the user's browser sees it
-   ("EDT", "PST", "UTC", etc). Falls back to the GMT offset for browsers
+/* Short timezone abbreviation for a Date in the given zone (or browser
+   default if zone omitted). Falls back to the GMT offset for browsers
    that don't return a name. */
-export function tzAbbrev(d) {
+export function tzAbbrev(d, zone) {
   if (!d) return "";
   try {
-    const parts = new Intl.DateTimeFormat([], { timeZoneName: "short" }).formatToParts(d);
+    const opts = { timeZoneName: "short" };
+    if (zone) opts.timeZone = zone;
+    const parts = new Intl.DateTimeFormat([], opts).formatToParts(d);
     const tz = parts.find(p => p.type === "timeZoneName");
     if (tz && tz.value) return tz.value;
   } catch {/* fall through */}
+  if (zone) return zone;
   const offMin = -d.getTimezoneOffset();
   const sign = offMin >= 0 ? "+" : "-";
   const ah = Math.floor(Math.abs(offMin) / 60).toString().padStart(2, "0");
@@ -475,7 +478,8 @@ export function tzAbbrev(d) {
   return `UTC${sign}${ah}:${am}`;
 }
 
-/* Format a time honoring the user's display-tz preference. */
+/* Format a time honoring the user's display-tz preference. `displayTz`:
+   "local" | "utc" | any IANA zone name like "America/New_York". */
 export function fmtTimeTz(d, displayTz) {
   if (!d) return "—";
   if (displayTz === "utc") {
@@ -483,7 +487,40 @@ export function fmtTimeTz(d, displayTz) {
       hour: "2-digit", minute: "2-digit", timeZone: "UTC", hour12: false,
     }) + " UTC";
   }
+  if (displayTz && displayTz !== "local") {
+    // Specific IANA zone
+    try {
+      const time = d.toLocaleTimeString([], {
+        hour: "2-digit", minute: "2-digit", timeZone: displayTz,
+      });
+      return time + " " + tzAbbrev(d, displayTz);
+    } catch {/* invalid zone — fall through to local */}
+  }
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + " " + tzAbbrev(d);
+}
+
+/* All IANA zones the runtime supports, or a curated fallback list for
+   browsers that don't expose Intl.supportedValuesOf. */
+export function listTimeZones() {
+  try {
+    if (typeof Intl.supportedValuesOf === "function") {
+      return Intl.supportedValuesOf("timeZone");
+    }
+  } catch {/* fall through */}
+  return [
+    "UTC",
+    "America/Anchorage", "America/Chicago", "America/Denver", "America/Halifax",
+    "America/Los_Angeles", "America/Mexico_City", "America/New_York", "America/Phoenix",
+    "America/Sao_Paulo", "America/St_Johns", "America/Toronto", "America/Vancouver",
+    "Asia/Dubai", "Asia/Hong_Kong", "Asia/Kolkata", "Asia/Seoul", "Asia/Shanghai",
+    "Asia/Singapore", "Asia/Tokyo",
+    "Australia/Brisbane", "Australia/Sydney",
+    "Europe/Amsterdam", "Europe/Athens", "Europe/Berlin", "Europe/Dublin",
+    "Europe/Istanbul", "Europe/Lisbon", "Europe/London", "Europe/Madrid",
+    "Europe/Moscow", "Europe/Oslo", "Europe/Paris", "Europe/Rome", "Europe/Stockholm",
+    "Europe/Vienna", "Europe/Warsaw", "Europe/Zurich",
+    "Pacific/Auckland", "Pacific/Honolulu",
+  ];
 }
 export const fmtDeg = (n, p = 1) => `${n.toFixed(p)}°`;
 

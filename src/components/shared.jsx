@@ -208,6 +208,96 @@ export function OutOfRangeNotice({ what, horizon }) {
    contains a small "Theme" cog (opens a sub-popover with the swatches)
    and an "i" info button at the bottom that routes to the in-app
    citations / About page. */
+/* Local | UTC | Other-IANA picker for the settings popover. */
+function TimeZoneRow({ displayTz, setDisplayTz }) {
+  const mode = displayTz === "local" || displayTz === "utc" ? displayTz : "other";
+  const [zoneList, setZoneList] = useState([]);
+  useEffect(() => {
+    import("../astro.js").then((m) => { setZoneList(m.listTimeZones?.() || []); }).catch(() => {});
+  }, []);
+
+  const guessLocalZone = () => {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch { return ""; }
+  };
+  const customValue = mode === "other" ? displayTz : guessLocalZone();
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.4rem",
+        width: "100%",
+        marginTop: "0.6rem",
+        padding: "0.5rem",
+        border: "1px solid var(--frame-border)",
+        borderRadius: 2,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+        <span className="display gold" style={{ fontSize: "0.78rem" }}>Time zone</span>
+        <div style={{ display: "flex", marginLeft: "auto", gap: 4 }}>
+          {[
+            { v: "local", label: "Local" },
+            { v: "utc", label: "UTC" },
+            { v: "other", label: "Other" },
+          ].map(({ v, label }) => (
+            <button
+              key={v}
+              onClick={() => {
+                if (v === "other") {
+                  // Default the custom selector to the user's local IANA zone.
+                  setDisplayTz(mode === "other" ? displayTz : guessLocalZone());
+                } else {
+                  setDisplayTz(v);
+                }
+              }}
+              className="ghost"
+              style={{
+                padding: "0.25rem 0.55rem",
+                border: "1px solid",
+                borderColor: mode === v ? "var(--accent-gold)" : "var(--frame-border)",
+                background: mode === v ? "var(--strip-bg)" : "transparent",
+                color: mode === v ? "var(--accent-gold)" : "var(--text-muted)",
+                cursor: "pointer",
+                borderRadius: 2,
+                fontFamily: "JetBrains Mono, monospace",
+                fontSize: "0.62rem",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {mode === "other" && (
+        <select
+          value={customValue}
+          onChange={(e) => setDisplayTz(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "0.35rem 0.5rem",
+            background: "var(--strip-bg)",
+            border: "1px solid var(--frame-border)",
+            color: "var(--accent-gold)",
+            borderRadius: 2,
+            fontFamily: "JetBrains Mono, monospace",
+            fontSize: "0.7rem",
+            cursor: "pointer",
+          }}
+        >
+          {zoneList.length === 0 && <option value={customValue}>{customValue || "(loading…)"}</option>}
+          {zoneList.map((z) => (
+            <option key={z} value={z}>{z}</option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+}
+
 export function SettingsCog({ theme, setTheme, displayTz, setDisplayTz, onOpenInfo }) {
   const [open, setOpen] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
@@ -318,46 +408,9 @@ export function SettingsCog({ theme, setTheme, displayTz, setDisplayTz, onOpenIn
             </div>
           )}
 
-          {/* Time zone — switches NOAA-sourced time displays between the user's local clock and UTC. */}
+          {/* Time zone — Local | UTC | Other (with IANA dropdown for custom zone). */}
           {setDisplayTz && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.6rem",
-                width: "100%",
-                marginTop: "0.6rem",
-                padding: "0.5rem",
-                border: "1px solid var(--frame-border)",
-                borderRadius: 2,
-              }}
-            >
-              <span className="display gold" style={{ fontSize: "0.78rem" }}>Time zone</span>
-              <div style={{ display: "flex", marginLeft: "auto", gap: 4 }}>
-                {["local", "utc"].map((v) => (
-                  <button
-                    key={v}
-                    onClick={() => setDisplayTz(v)}
-                    className="ghost"
-                    style={{
-                      padding: "0.25rem 0.55rem",
-                      border: "1px solid",
-                      borderColor: displayTz === v ? "var(--accent-gold)" : "var(--frame-border)",
-                      background: displayTz === v ? "var(--strip-bg)" : "transparent",
-                      color: displayTz === v ? "var(--accent-gold)" : "var(--text-muted)",
-                      cursor: "pointer",
-                      borderRadius: 2,
-                      fontFamily: "JetBrains Mono, monospace",
-                      fontSize: "0.62rem",
-                      letterSpacing: "0.08em",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {v === "local" ? "Local" : "UTC"}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <TimeZoneRow displayTz={displayTz} setDisplayTz={setDisplayTz} />
           )}
 
           {/* Info / About + citations */}
