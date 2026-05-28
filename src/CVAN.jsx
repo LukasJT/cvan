@@ -431,6 +431,7 @@ export default function CVAN() {
                 bortleAuto={bortleAuto}
                 mapOverlays={mapOverlays}
                 setMapOverlays={setMapOverlays}
+                onPickCoords={(lat, lon) => setCoords({ lat, lon, label: `${lat.toFixed(4)}, ${lon.toFixed(4)} (map)` })}
               />
             )}
             {tab === "kpforecast" && coords && (

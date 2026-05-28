@@ -11,7 +11,7 @@ const MAX_HOURS = 72; // three days
 
 export function Aurora({
   aurora, weather, bortle, sky, coords, kpForecast, now, weatherStale,
-  bortleAuto, mapOverlays, setMapOverlays,
+  bortleAuto, mapOverlays, setMapOverlays, onPickCoords,
 }) {
   if (!aurora) {
     return (
@@ -48,6 +48,7 @@ export function Aurora({
         now={now}
         mapOverlays={mapOverlays}
         setMapOverlays={setMapOverlays}
+        onPickCoords={onPickCoords}
       />
     </div>
   );
@@ -320,7 +321,7 @@ function LiveView({ aurora, weather, bortle, sky, coords, now, weatherStale, bor
    slider to see the auroral oval and day/night terminator at any time
    in the next 3 days. The user's location is pinned (clicks suppressed)
    so they can see the oval shift relative to where they actually are. */
-function Aurora3DayMap({ coords, weather, aurora, bortleAuto, kpForecast, now, mapOverlays, setMapOverlays }) {
+function Aurora3DayMap({ coords, weather, aurora, bortleAuto, kpForecast, now, mapOverlays, setMapOverlays, onPickCoords }) {
   const [previewTime, setPreviewTime] = useState(null);
   const tzName = weather?.timezone ?? null;
   const nowDate = now ?? new Date();
@@ -363,7 +364,7 @@ function Aurora3DayMap({ coords, weather, aurora, bortleAuto, kpForecast, now, m
       />
       <MapPanel
         coords={coords}
-        onPick={() => { /* read-only — preserve user's chosen coords */ }}
+        onPick={onPickCoords}
         weather={weather}
         aurora={syntheticAurora}
         bortleAuto={bortleAuto}
