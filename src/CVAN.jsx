@@ -316,7 +316,13 @@ export default function CVAN() {
 
       <div className="star-bg" />
 
-      <div className="relative max-w-6xl mx-auto px-6 py-8">
+      {/* Reserved 160x600 side ad slots — fixed-position, vertically centered.
+          Empty until an ad script is dropped in; the surrounding layout already
+          reserves the gutter so adding ads here later won't reflow the page. */}
+      <aside id="cvan-ad-left" className="cvan-side-ad cvan-side-ad-left" aria-hidden="true"></aside>
+      <aside id="cvan-ad-right" className="cvan-side-ad cvan-side-ad-right" aria-hidden="true"></aside>
+
+      <div className="relative max-w-6xl mx-auto px-6 py-8 cvan-main">
 
         {/* HEADER */}
         <header className="mb-8">
@@ -678,6 +684,33 @@ function CvanGlobalStyles() {
       .leaflet-control-zoom a { background: var(--panel-bg-to) !important; color: var(--accent-gold) !important; border: 1px solid var(--frame-border) !important; }
       .leaflet-control-zoom a:hover { background: var(--strip-bg) !important; }
       .cvan-marker { background: transparent; border: none; }
+
+      /* ----- Reserved 160x600 side ad slots -----
+         Below 1280px the slots are hidden and content uses the normal layout.
+         Between 1280 and 1503px the content shrinks so 176px gutters
+         (160 banner + 8 outer margin + 8 content gap) are always available.
+         At 1504px+ the natural mx-auto centering already leaves >=176px on
+         each side of the 1152px container. */
+      .cvan-side-ad {
+        position: fixed;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 160px;
+        height: 600px;
+        z-index: 5;
+        display: none;
+        pointer-events: auto;
+      }
+      .cvan-side-ad-left  { left: 8px; }
+      .cvan-side-ad-right { right: 8px; }
+      @media (min-width: 1280px) {
+        .cvan-side-ad { display: block; }
+      }
+      @media (min-width: 1280px) and (max-width: 1503px) {
+        .cvan-main {
+          max-width: calc(100vw - 352px) !important;
+        }
+      }
     `}</style>
   );
 }
