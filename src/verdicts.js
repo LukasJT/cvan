@@ -108,6 +108,74 @@ export function deepSkyVerdict(sky, bortle, cloud) {
   return { rating: "POOR", color: "var(--error)", text: "Severe light pollution; only Moon, planets, brightest stars/clusters." };
 }
 
+/* Visibility verdict for an individual planet. `snap` is the geocentric
+   snapshot (alt, az, magnitude, etc.); `sky` is the full sky context for
+   sun altitude, twilight class, moon altitude. */
+export function planetVerdict(snap, sky, cloud) {
+  if (!snap || snap.alt == null) {
+    return { rating: "NO DATA", color: "var(--text-muted)", text: "Observer location not set." };
+  }
+
+  if (snap.alt < 0) {
+    return {
+      rating: "BELOW HORIZON",
+      color: "var(--text-muted)",
+      text: `Currently ${Math.abs(snap.alt).toFixed(0)}° below the horizon — wait for it to rise.`,
+    };
+  }
+
+  // Daytime — most planets washed out, but Venus and very bright Jupiter
+  // can be picked up naked-eye if you know exactly where to look.
+  if (sky?.tw?.code === "day") {
+    if (snap.magnitude < -3.0) {
+      return {
+        rating: "DAYLIGHT NAKED-EYE",
+        color: "var(--accent-gold)",
+        text: `Mag ${snap.magnitude.toFixed(1)} — bright enough to find naked-eye in daytime if you know where to look. Use the sun for triangulation; never sweep the area with binoculars.`,
+      };
+    }
+    return {
+      rating: "DAYLIGHT",
+      color: "var(--text-muted)",
+      text: "Sun is up — wait for civil/nautical twilight before looking.",
+    };
+  }
+
+  if (snap.alt < 10) {
+    return {
+      rating: "VERY LOW",
+      color: "var(--warning)",
+      text: `Only ${snap.alt.toFixed(0)}° above the horizon — heavy atmospheric extinction. Wait for it to climb higher.`,
+    };
+  }
+
+  if (cloud != null && cloud > 70) {
+    return { rating: "CLOUDED", color: "var(--warning)", text: `${cloud}% cloud cover blocking view.` };
+  }
+
+  if (snap.magnitude > 6.0) {
+    return {
+      rating: "TELESCOPE",
+      color: "var(--accent-gold)",
+      text: `Mag ${snap.magnitude.toFixed(1)} — fainter than the naked-eye limit (~6.5). Binoculars or small scope needed.`,
+    };
+  }
+
+  if (snap.alt > 45) {
+    return {
+      rating: "EXCELLENT",
+      color: "var(--accent-green)",
+      text: `${snap.alt.toFixed(0)}° altitude, mag ${snap.magnitude.toFixed(1)} — well above atmospheric haze. Prime viewing.`,
+    };
+  }
+
+  return {
+    rating: "VISIBLE",
+    color: "var(--accent-gold)",
+    text: `${snap.alt.toFixed(0)}° altitude, mag ${snap.magnitude.toFixed(1)} — visible naked-eye.`,
+  };
+}
+
 export function constellationVerdict(c, sky, bortle, cloud) {
   if (c.alt < 0) return { rating: "DOWN", color: "var(--text-subtle)", note: "Below horizon — wait for it to rise or check seasonal availability." };
   if (c.alt < 10) return { rating: "LOW", color: "var(--text-muted)", note: "Very low altitude — atmospheric extinction will make it difficult." };

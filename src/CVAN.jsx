@@ -460,7 +460,14 @@ export default function CVAN() {
             )}
             {tab === "solar" && <Solar />}
             {tab === "solarsystem" && coords && (
-              <SolarSystem coords={coords} now={now} displayTz={displayTz} />
+              <SolarSystem
+                coords={coords}
+                now={now}
+                displayTz={displayTz}
+                sky={skyWithEvents}
+                weather={weather}
+                weatherStale={!weather}
+              />
             )}
             {tab === "constellations" && coords && (
               <Constellations

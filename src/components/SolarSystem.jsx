@@ -1,18 +1,90 @@
 import React, { useMemo, useState } from "react";
-import { fmtDeg, fmtTime, findEvents, toJulian, azimuthName, fmtTimeTz } from "../astro.js";
+import {
+  fmtDeg, fmtTime, findEvents, toJulian, azimuthName, fmtTimeTz,
+  cloudCoverAt, computeSky, moonPhaseName, MOON_NEGLIGIBLE_ALT_DEG,
+  equatorialToHorizontal, lst,
+} from "../astro.js";
 import {
   PLANETS, allPlanetSnapshots, orreryPositions, geocentric,
   galileanMoons, saturnRingAngles,
   grsSystemIILongitude, jupiterCMLongitudeII,
   nextGRSTransits, jdToDate, SATURN_RING_OUTER_RADII,
   findConjunctions, nextOpposition, nextGreatestElongation, nextSolarTransit,
+  planetAltitudeCurve,
 } from "../planets.js";
-import { DataCell } from "./shared.jsx";
+import { DataCell, FactorRow, TimeOffsetSlider, Legend, OutOfRangeNotice } from "./shared.jsx";
+import { planetVerdict, cloudVerdict } from "../verdicts.js";
 
-/* Solar System tab. Wires the planets ephemeris to a card-per-planet grid,
-   a 2D orrery (heliocentric/geocentric toggle), and a "brightest tonight"
-   summary. Phase 1 + 2 of the solar-system feature roadmap. */
-export function SolarSystem({ coords, now, displayTz }) {
+/* Solar System tab. Top-level sub-nav switches between the All-Planets
+   overview (orrery + cards + events) and a per-planet detail page that
+   mirrors the Milky Way tab's layout. */
+export function SolarSystem({ coords, now, displayTz, sky, weather, weatherStale }) {
+  const [subTab, setSubTab] = useState("all");
+  return (
+    <div className="space-y-6">
+      <SubTabNav subTab={subTab} setSubTab={setSubTab} />
+      {subTab === "all" ? (
+        <AllPlanetsView coords={coords} now={now} displayTz={displayTz} />
+      ) : (
+        <PlanetDetail
+          planetKey={subTab}
+          coords={coords}
+          now={now}
+          displayTz={displayTz}
+          sky={sky}
+          weather={weather}
+          weatherStale={weatherStale}
+        />
+      )}
+    </div>
+  );
+}
+
+/* Sub-tab strip: ALL | ☿ Mercury | ♀ Venus | ♂ Mars | ... in the same
+   visual language as the main TabNav, but slightly smaller. */
+function SubTabNav({ subTab, setSubTab }) {
+  const items = [
+    { key: "all", label: "All", symbol: "·" },
+    ...PLANETS.filter(p => p.key !== "earth").map(p => ({ key: p.key, label: p.name, symbol: p.symbol, color: p.color })),
+  ];
+  return (
+    <nav className="flex gap-1 flex-wrap items-center border-b pb-2" style={{ borderColor: "var(--panel-border)" }}>
+      {items.map(it => {
+        const active = subTab === it.key;
+        return (
+          <button
+            key={it.key}
+            onClick={() => setSubTab(it.key)}
+            className="ghost"
+            style={{
+              padding: "0.4rem 0.8rem",
+              border: "1px solid",
+              borderColor: active ? "var(--accent-gold)" : "var(--frame-border)",
+              background: active ? "var(--strip-bg)" : "transparent",
+              color: active ? "var(--accent-gold)" : "var(--text-muted)",
+              cursor: "pointer",
+              borderRadius: 2,
+              fontFamily: "Cinzel, serif",
+              fontSize: "0.75rem",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <span style={{ fontSize: "1.05rem", color: it.color || "currentColor" }}>{it.symbol}</span>
+            {it.label}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+/* All-planets overview: orrery + cards + events. (Was the original
+   SolarSystem render body.) */
+function AllPlanetsView({ coords, now, displayTz }) {
   const [mode, setMode] = useState("helio"); // "helio" | "geo"
   const [zoom, setZoom] = useState("all");   // "inner" | "all"
 
@@ -82,6 +154,326 @@ export function SolarSystem({ coords, now, displayTz }) {
 
       <PlanetaryEvents now={now} displayTz={displayTz} />
     </div>
+  );
+}
+
+/* ------- Per-planet detail page ------- */
+
+const MAX_HOURS = 7 * 24; // one week
+
+function PlanetDetail({ planetKey, coords, now, displayTz, sky, weather, weatherStale }) {
+  const meta = PLANETS.find(p => p.key === planetKey);
+  const [previewTime, setPreviewTime] = useState(null);
+
+  const tzName = weather?.timezone ?? null;
+  const isNowPreview = previewTime == null;
+  const effectivePreview = isNowPreview ? now : previewTime;
+
+  const observer = coords ? { lat: coords.lat, lon: coords.lon } : null;
+
+  // Geocentric + horizontal snapshot at the preview instant
+  const snap = useMemo(() => {
+    if (!observer) return null;
+    const jd = toJulian(effectivePreview);
+    const g = geocentric(jd, planetKey);
+    const sidereal = lst(jd, observer.lon);
+    const hz = equatorialToHorizontal(g.ra, g.dec, sidereal, observer.lat);
+    return { ...g, alt: hz.alt, az: hz.az };
+  }, [effectivePreview, observer?.lat, observer?.lon, planetKey]);
+
+  // Current snap (for verdict — never moves while the user scrubs)
+  const liveSnap = useMemo(() => {
+    if (!observer) return null;
+    const jd = toJulian(now);
+    const g = geocentric(jd, planetKey);
+    const sidereal = lst(jd, observer.lon);
+    const hz = equatorialToHorizontal(g.ra, g.dec, sidereal, observer.lat);
+    return { ...g, alt: hz.alt, az: hz.az };
+  }, [now.getTime(), observer?.lat, observer?.lon, planetKey]);
+
+  const previewSky = useMemo(
+    () => isNowPreview ? sky : (coords ? computeSky(effectivePreview, coords) : null),
+    [sky, effectivePreview, coords, isNowPreview]
+  );
+  const previewCloud = useMemo(() => {
+    if (isNowPreview) return weatherStale ? null : weather?.current?.cloud_cover ?? null;
+    return cloudCoverAt(weather, effectivePreview.getTime());
+  }, [isNowPreview, effectivePreview, weather, weatherStale]);
+  const previewCloudOutOfRange = !isNowPreview && previewCloud == null;
+  const cloud = weatherStale ? null : weather?.current?.cloud_cover ?? null;
+
+  const verdict = planetVerdict(liveSnap, sky, cloud);
+
+  const events = useMemo(() => {
+    if (!coords) return null;
+    return findEvents(now, coords.lat, coords.lon, (jd) => {
+      const g = geocentric(jd, planetKey);
+      return { ra: g.ra, dec: g.dec };
+    });
+  }, [coords?.lat, coords?.lon, now.toDateString(), planetKey]);
+
+  if (!observer) {
+    return <div className="panel corner p-12 text-center mono muted">Location required to compute {meta.name}'s position.</div>;
+  }
+
+  const moonSep = previewSky?.moon ? angularSepDeg(snap.ra, snap.dec, previewSky.moon.ra, previewSky.moon.dec) : null;
+
+  return (
+    <div className="space-y-6">
+      {/* Header: Right Now + Verdict */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="panel corner p-6" style={{ borderTopColor: meta.color }}>
+          <div className="mono text-xs uppercase tracking-widest mb-3 muted">{meta.name} · Right Now</div>
+          <div className="flex items-center gap-4 mb-4">
+            <span className="display text-5xl" style={{ color: meta.color }}>{meta.symbol}</span>
+            <div>
+              <div className="display gold text-3xl">{meta.name}</div>
+              <div className="mono text-sm secondary">
+                mag <span className="gold">{liveSnap.magnitude.toFixed(2)}</span>
+                · {liveSnap.diamArcsec.toFixed(1)}″ apparent
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <DataCell label="Altitude" value={fmtDeg(liveSnap.alt)}
+              sub={liveSnap.alt > 30 ? "well placed" : liveSnap.alt > 0 ? "low" : "below horizon"} />
+            <DataCell label="Azimuth" value={fmtDeg(liveSnap.az)} sub={azimuthName(liveSnap.az)} />
+            <DataCell label="Distance" value={`${liveSnap.delta.toFixed(2)} AU`} sub={`r ${liveSnap.r.toFixed(2)} AU`} />
+            <DataCell label="Illuminated" value={`${(liveSnap.illumFrac * 100).toFixed(0)}%`}
+              sub={`phase ${liveSnap.phaseAngleDeg.toFixed(0)}°`} />
+          </div>
+        </div>
+
+        <div className="panel corner p-6">
+          <div className="mono text-xs uppercase tracking-widest mb-3 muted">Verdict</div>
+          <div className="display text-2xl mb-2" style={{ color: verdict.color }}>{verdict.rating}</div>
+          <div className="body text-base primary">{verdict.text}</div>
+        </div>
+      </div>
+
+      {/* Rise / Transit / Set */}
+      <div className="panel corner p-6">
+        <div className="mono text-xs uppercase tracking-widest mb-3 muted">Tonight's Window</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <DataCell label="Rise" value={fmtTime(events?.rise)}
+            sub={events?.rise ? `mag ${liveSnap.magnitude.toFixed(1)}` : "no rise today"} />
+          <DataCell label="Transit" value={fmtTime(events?.transit)}
+            sub={events?.maxAlt != null ? `max ${fmtDeg(events.maxAlt)}` : null} />
+          <DataCell label="Set" value={fmtTime(events?.set)}
+            sub={events?.set ? azimuthName(snap.az) : null} />
+          <DataCell label="Best Viewing"
+            value={events?.transit ? fmtTime(events.transit) : "—"}
+            sub={events?.maxAlt != null ? `peak ${fmtDeg(events.maxAlt)}` : null} />
+        </div>
+      </div>
+
+      {/* Conditions panel with time slider */}
+      <div className="panel corner p-6">
+        <div className="mono text-xs uppercase tracking-widest mb-3 muted">
+          Conditions Affecting {isNowPreview ? "Current View" : "Previewed View"}
+        </div>
+        <TimeOffsetSlider
+          now={now}
+          previewTime={previewTime}
+          setPreviewTime={setPreviewTime}
+          maxHours={MAX_HOURS}
+          tzName={tzName}
+          label="View at"
+        />
+        <div className="space-y-3">
+          <FactorRow
+            label="Planet altitude"
+            status={snap.alt > 30 ? "good" : snap.alt > 10 ? "fair" : "bad"}
+            note={
+              snap.alt < 0
+                ? `Below horizon at ${fmtDeg(Math.abs(snap.alt))} — invisible.`
+                : `${fmtDeg(snap.alt)} altitude, ${fmtDeg(snap.az)} azimuth (${azimuthName(snap.az)}). Higher is better — thinner atmosphere.`
+            }
+          />
+          <FactorRow
+            label="Twilight"
+            status={previewSky?.tw?.code === "day"
+              ? (meta.V0 != null && liveSnap.magnitude < -3 ? "fair" : "bad")
+              : previewSky?.tw?.code === "civil"
+                ? (liveSnap.magnitude < 0 ? "fair" : "bad")
+                : "good"}
+            note={previewSky ? `${previewSky.tw.name} — sun at ${fmtDeg(previewSky.sunHz.alt)}. ${planetTwilightNote(planetKey, liveSnap, previewSky.tw.code)}` : "no sky data"}
+          />
+          {moonSep != null && (
+            <FactorRow
+              label="Moon glare"
+              status={moonSep > 30 || (previewSky?.moonHz?.alt ?? -90) < MOON_NEGLIGIBLE_ALT_DEG ? "good" : moonSep > 10 ? "fair" : "bad"}
+              note={
+                (previewSky?.moonHz?.alt ?? -90) < MOON_NEGLIGIBLE_ALT_DEG
+                  ? `Moon ${fmtDeg(Math.abs(previewSky.moonHz.alt))} below horizon — no glare.`
+                  : `Moon ${fmtDeg(moonSep)} away (${moonPhaseName(previewSky?.phase?.phaseFraction ?? 0)}, ${((previewSky?.phase?.illumination ?? 0) * 100).toFixed(0)}% illum). Close approaches wash out faint detail.`
+              }
+            />
+          )}
+          <FactorRow
+            label="Cloud cover"
+            status={previewCloudOutOfRange || (isNowPreview && weatherStale) ? "unknown"
+              : previewCloud == null ? "unknown"
+              : previewCloud < 30 ? "good" : previewCloud < 60 ? "fair" : "bad"}
+            note={
+              previewCloudOutOfRange ? "Beyond 16-day Open-Meteo forecast."
+              : (isNowPreview && weatherStale) ? "Weather forecast out of range."
+              : previewCloud != null ? `${previewCloud}% — ${cloudVerdict(previewCloud)}`
+              : "weather data unavailable"
+            }
+          />
+        </div>
+        {(weatherStale && isNowPreview) && <OutOfRangeNotice what="Cloud cover forecast" horizon="16 days from today" />}
+      </div>
+
+      {/* Planet-specific extras */}
+      {planetKey === "jupiter" && (
+        <div className="panel corner p-6">
+          <JupiterExtras now={now} displayTz={displayTz} />
+        </div>
+      )}
+      {planetKey === "saturn" && (
+        <div className="panel corner p-6">
+          <SaturnExtras now={now} />
+        </div>
+      )}
+
+      {/* Night-by-night altitude chart */}
+      <PlanetNightChart planetKey={planetKey} coords={coords} now={now} tzName={tzName} meta={meta} />
+    </div>
+  );
+}
+
+function angularSepDeg(ra1, dec1, ra2, dec2) {
+  const DEG = Math.PI / 180;
+  const r1 = ra1 * DEG, d1 = dec1 * DEG;
+  const r2 = ra2 * DEG, d2 = dec2 * DEG;
+  const c = Math.sin(d1) * Math.sin(d2) + Math.cos(d1) * Math.cos(d2) * Math.cos(r1 - r2);
+  return Math.acos(Math.max(-1, Math.min(1, c))) * 180 / Math.PI;
+}
+
+function planetTwilightNote(key, snap, twCode) {
+  if (twCode === "day") {
+    if (snap.magnitude < -3) return "Bright enough to find naked-eye if you know where to look.";
+    return "Wait for twilight — daytime sky overwhelms it.";
+  }
+  if (twCode === "civil" || twCode === "nautical") {
+    return "Bright planets visible already; faint surface detail needs deeper night.";
+  }
+  return "Full astronomical night — best contrast.";
+}
+
+/* Night-by-night chart for a planet. Same scrubber pattern as the Milky
+   Way page, but renders the planet's altitude curve over 36 hours. */
+function PlanetNightChart({ planetKey, coords, now, tzName, meta }) {
+  const [dayOffset, setDayOffset] = useState(0);
+  const anchor = useMemo(() => {
+    const d = new Date(now);
+    d.setDate(d.getDate() + dayOffset);
+    return d;
+  }, [now, dayOffset]);
+
+  const curve = useMemo(
+    () => planetAltitudeCurve(anchor, planetKey, coords.lat, coords.lon),
+    [anchor, planetKey, coords.lat, coords.lon]
+  );
+
+  const fmt = (d, opts) =>
+    tzName ? d.toLocaleString([], { ...opts, timeZone: tzName })
+           : d.toLocaleString([], opts);
+
+  return (
+    <div className="panel corner p-6">
+      <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
+        <div className="mono text-xs uppercase tracking-widest muted">
+          {meta.name} · Altitude vs Time · Night-by-Night
+        </div>
+        <div className="mono text-xs subtle">Drag to scrub through the next 7 nights</div>
+      </div>
+
+      <div className="frame p-3 mb-3">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="mono text-xs uppercase tracking-widest muted">Night of</span>
+            <span className="display gold text-sm">
+              {fmt(anchor, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+            </span>
+            {dayOffset > 0 && <span className="mono text-xs subtle">+{dayOffset} day{dayOffset === 1 ? "" : "s"}</span>}
+          </div>
+          <button className="ghost" onClick={() => setDayOffset(0)} disabled={dayOffset === 0}
+            style={{ opacity: dayOffset === 0 ? 0.4 : 1, padding: "0.25rem 0.6rem", fontSize: "0.65rem" }}>
+            TONIGHT
+          </button>
+        </div>
+        <input type="range" min={0} max={7} step={1} value={dayOffset}
+          onChange={(e) => setDayOffset(parseInt(e.target.value))} style={{ width: "100%" }} />
+        <div className="mono text-xs flex justify-between mt-1 subtle">
+          <span>tonight</span><span>+3d</span><span>+7d</span>
+        </div>
+      </div>
+
+      <PlanetAltitudeSvg curve={curve} meta={meta} />
+      <div className="mt-3 flex gap-4 mono text-xs flex-wrap secondary">
+        <Legend color={meta.color} label={meta.name} />
+        <Legend color="var(--accent-warm)" label="Sun" />
+        <Legend color="#e8e8e8" label="Moon" />
+        <Legend color="var(--accent-green)" label="Astronomical night" dashed />
+      </div>
+    </div>
+  );
+}
+
+function PlanetAltitudeSvg({ curve, meta }) {
+  if (!curve?.length) return null;
+  const W = 720, H = 220, P = 28;
+  const xScale = (h) => P + (h / 36) * (W - P * 2);
+  const yScale = (alt) => H - P - ((alt + 30) / 120) * (H - P * 2);
+  const path = (sel) => curve.map((s, i) => `${i === 0 ? "M" : "L"} ${xScale(s.h)} ${yScale(sel(s))}`).join(" ");
+  // Twilight shading: sun < -18° = astronomical night
+  const nightBands = [];
+  let bandStart = null;
+  for (const s of curve) {
+    if (s.sunAlt < -18 && bandStart == null) bandStart = s.h;
+    if (s.sunAlt >= -18 && bandStart != null) { nightBands.push([bandStart, s.h]); bandStart = null; }
+  }
+  if (bandStart != null) nightBands.push([bandStart, 36]);
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%">
+      <rect x="0" y="0" width={W} height={H} fill="var(--bg-base)" />
+      {/* Night shading */}
+      {nightBands.map(([a, b], i) => (
+        <rect key={i} x={xScale(a)} y={P} width={xScale(b) - xScale(a)} height={H - 2 * P}
+          fill="var(--accent-green)" opacity="0.06" />
+      ))}
+      {/* Horizon line */}
+      <line x1={P} y1={yScale(0)} x2={W - P} y2={yScale(0)}
+        stroke="var(--accent-gold)" strokeWidth="0.8" strokeDasharray="2 3" opacity="0.5" />
+      <text x={P} y={yScale(0) - 3} fontSize="8" fontFamily="JetBrains Mono" fill="var(--accent-gold)" opacity="0.7">HORIZON 0°</text>
+
+      {/* Sun + moon curves */}
+      <path d={path(s => s.sunAlt)} fill="none" stroke="var(--accent-warm)" strokeWidth="1" opacity="0.65" />
+      <path d={path(s => s.moonAlt)} fill="none" stroke="#e8e8e8" strokeWidth="1" opacity="0.55" />
+      {/* Planet curve */}
+      <path d={path(s => s.planetAlt)} fill="none" stroke={meta.color} strokeWidth="2" />
+
+      {/* Hour ticks */}
+      {[0, 6, 12, 18, 24, 30, 36].map((h) => (
+        <text key={h} x={xScale(h)} y={H - 8} fontSize="8" fontFamily="JetBrains Mono"
+          fill="var(--text-muted)" textAnchor="middle">
+          {((h + 12) % 24).toString().padStart(2, "0")}:00
+        </text>
+      ))}
+      {/* Altitude gridlines */}
+      {[-30, -10, 10, 30, 60, 90].map(alt => (
+        <g key={alt}>
+          <line x1={P} y1={yScale(alt)} x2={W - P} y2={yScale(alt)}
+            stroke="var(--frame-border)" strokeWidth="0.4" opacity="0.3" />
+          <text x={6} y={yScale(alt) + 3} fontSize="7" fontFamily="JetBrains Mono"
+            fill="var(--text-subtle)">{alt}°</text>
+        </g>
+      ))}
+    </svg>
   );
 }
 

@@ -9,7 +9,7 @@
 
    All angles are degrees on the outside; radians only inside helpers.
    ========================================================================= */
-import { DEG, RAD, clamp, toJulian, gmst, lst, equatorialToHorizontal } from "./astro.js";
+import { DEG, RAD, clamp, toJulian, gmst, lst, equatorialToHorizontal, sunPosition, moonPosition, moonPhase, MOON_NEGLIGIBLE_ALT_DEG } from "./astro.js";
 
 /* Obliquity of the J2000 ecliptic (IAU 2006, sufficient for our accuracy). */
 export const OBLIQUITY_J2000_DEG = 23.43928;
@@ -617,6 +617,35 @@ export function nextSolarTransit(key, fromJd, maxYears = 130) {
     prev = cur;
   }
   return null;
+}
+
+/* 36-hour altitude curve for a single planet at half-hour steps. Returns
+   samples carrying sun + moon + planet altitudes so the chart can shade
+   twilight bands and show the planet against night. */
+export function planetAltitudeCurve(anchor, planetKey, lat, lon) {
+  const start = new Date(anchor);
+  start.setHours(12, 0, 0, 0);
+  const samples = [];
+  for (let h = 0; h <= 36; h += 0.5) {
+    const t = new Date(start.getTime() + h * 3600000);
+    const jd = toJulian(t);
+    const sun = sunPosition(jd);
+    const moon = moonPosition(jd);
+    const sidereal = lst(jd, lon);
+    const sunHz = equatorialToHorizontal(sun.ra, sun.dec, sidereal, lat);
+    const moonHz = equatorialToHorizontal(moon.ra, moon.dec, sidereal, lat);
+    const planet = geocentric(jd, planetKey);
+    const planetHz = equatorialToHorizontal(planet.ra, planet.dec, sidereal, lat);
+    samples.push({
+      t, h,
+      sunAlt: sunHz.alt,
+      moonAlt: moonHz.alt,
+      planetAlt: planetHz.alt,
+      planetAz: planetHz.az,
+      magnitude: planet.magnitude,
+    });
+  }
+  return samples;
 }
 
 /* For the helio/geo orrery: ecliptic-plane (x, y) in AU. The geocentric
