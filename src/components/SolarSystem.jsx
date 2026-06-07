@@ -16,6 +16,10 @@ import { DataCell, FactorRow, TimeOffsetSlider, Legend, OutOfRangeNotice } from 
 import { planetVerdict, cloudVerdict } from "../verdicts.js";
 import { fetchNeoFeed, fetchRoverInfo, fetchRoverLatestPhotos, MARS_ROVERS, shortSol } from "../nasa.js";
 import { COMETS, cometSnapshot } from "../comets.js";
+import {
+  DWARF_PLANETS, CENTAURS, TNOS, smallBodySnapshot,
+  LAGRANGE_POINTS, lagrangePositions, SOLAR_SYSTEM_SCALE_AU,
+} from "../outerSystem.js";
 
 /* Solar System tab. Top-level sub-nav switches between the All-Planets
    overview (orrery + cards + events) and a per-planet detail page that
@@ -29,6 +33,10 @@ export function SolarSystem({ coords, now, displayTz, sky, weather, weatherStale
     content = <NeosView now={now} displayTz={displayTz} />;
   } else if (subTab === "comets") {
     content = <CometsView now={now} coords={coords} />;
+  } else if (subTab === "dwarfs") {
+    content = <DwarfsView now={now} />;
+  } else if (subTab === "outer") {
+    content = <OuterSolarSystemView now={now} />;
   } else {
     content = (
       <PlanetDetail
@@ -58,6 +66,8 @@ function SubTabNav({ subTab, setSubTab }) {
     ...PLANETS.filter(p => p.key !== "earth").map(p => ({ key: p.key, label: p.name, symbol: p.symbol, color: p.color })),
     { key: "neos",   label: "NEOs",   symbol: "⌀", color: "#e88a4a" },
     { key: "comets", label: "Comets", symbol: "☄", color: "#9fd7f7" },
+    { key: "dwarfs", label: "Dwarfs", symbol: "⚳", color: "#c8a890" },
+    { key: "outer",  label: "Outer",  symbol: "◌", color: "#8090c0" },
   ];
   return (
     <nav className="flex gap-1 flex-wrap items-center border-b pb-2" style={{ borderColor: "var(--panel-border)" }}>
@@ -1280,6 +1290,262 @@ function MarsMap() {
         );
       })}
     </svg>
+  );
+}
+
+/* ===== Dwarf planets, Centaurs, TNOs ==================================== */
+function DwarfsView({ now }) {
+  const [group, setGroup] = useState("dwarf"); // dwarf | centaur | tno
+  const catalog = group === "dwarf" ? DWARF_PLANETS : group === "centaur" ? CENTAURS : TNOS;
+  const groupTitle =
+    group === "dwarf" ? "Dwarf Planets"
+    : group === "centaur" ? "Centaurs"
+    : "Trans-Neptunian Objects";
+  const groupBlurb =
+    group === "dwarf" ? "IAU-recognized dwarf planets — Ceres in the asteroid belt, Pluto/Haumea/Makemake in the Kuiper belt, Eris in the scattered disc."
+    : group === "centaur" ? "Centaurs occupy planet-crossing orbits between Jupiter and Neptune. Transitional between Kuiper-belt objects and short-period comets."
+    : "TNOs orbit beyond Neptune. Includes resonant Kuiper-belt objects (plutinos), classical cubewanos, scattered-disc bodies, and detached objects like Sedna.";
+
+  const snaps = useMemo(() => catalog.map(b => smallBodySnapshot(now, b)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [now.toDateString(), group]
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="panel corner p-6">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+          <div>
+            <div className="display gold text-lg">{groupTitle}</div>
+            <div className="body text-xs muted mt-1" style={{ maxWidth: 720 }}>{groupBlurb}</div>
+          </div>
+          <SegmentedToggle
+            value={group}
+            onChange={setGroup}
+            options={[
+              { v: "dwarf",   label: "Dwarf planets" },
+              { v: "centaur", label: "Centaurs" },
+              { v: "tno",     label: "TNOs" },
+            ]}
+          />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {snaps.map(b => <SmallBodyCard key={b.key} b={b} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SmallBodyCard({ b }) {
+  const periodStr = b.periodYears < 100 ? `${b.periodYears.toFixed(1)} yr`
+    : b.periodYears < 1000 ? `${b.periodYears.toFixed(0)} yr`
+    : `${(b.periodYears / 1000).toFixed(1)}k yr`;
+  const visHint =
+    b.magnitude < 6 ? "Naked-eye"
+    : b.magnitude < 10 ? "Binoculars"
+    : b.magnitude < 14 ? "Small telescope"
+    : b.magnitude < 18 ? "Large amateur scope"
+    : "Professional scope";
+  return (
+    <div className="panel corner p-5" style={{ borderTopColor: b.color }}>
+      <div className="flex items-baseline gap-3 mb-2">
+        <span className="display text-2xl" style={{ color: b.color }}>⚳</span>
+        <div className="flex-1">
+          <div className="display gold text-base">{b.name}</div>
+          <div className="mono text-xs muted">{b.type} · discovered {b.discovered}</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <DataCell label="Apparent mag" value={b.magnitude.toFixed(2)} sub={visHint} />
+        <DataCell label="Δ Geo" value={`${b.delta.toFixed(2)} AU`} sub={`r ${b.r.toFixed(2)} AU`} />
+        <DataCell label="Orbit" value={`a ${b.a.toFixed(2)} AU`}
+          sub={`e ${b.e.toFixed(3)} · i ${b.i.toFixed(1)}°`} />
+        <DataCell label="Period" value={periodStr}
+          sub={`${b.perihelion.toFixed(1)}–${b.aphelion.toFixed(1)} AU`} />
+      </div>
+      <div className="mono text-xs subtle italic mb-2">
+        diameter ≈ {b.diamKm.toLocaleString()} km · H = {b.H.toFixed(2)}
+      </div>
+      <div className="body text-xs secondary">{b.notes}</div>
+    </div>
+  );
+}
+
+/* ===== Outer Solar System: log-scale Kuiper/Oort viz + Lagrange points = */
+function OuterSolarSystemView({ now }) {
+  return (
+    <div className="space-y-6">
+      <div className="panel corner p-6">
+        <div className="display gold text-lg mb-1">Solar System Scale · Kuiper Belt → Oort Cloud</div>
+        <div className="body text-xs muted mb-4" style={{ maxWidth: 720 }}>
+          Distance from the Sun on a logarithmic scale. Spans 8 orders of magnitude
+          from Mercury's orbit to the gravitational edge of the solar system, ending
+          near the next-nearest star. Linear plots can't show this range.
+        </div>
+        <SolarSystemScaleAxis />
+        <div className="mono text-xs subtle italic mt-3">
+          Voyager 1 crossed the heliopause in August 2012 at 121 AU. It and Voyager 2
+          will reach the inner Oort cloud in roughly 300 years — and the outer edge
+          in tens of thousands.
+        </div>
+      </div>
+
+      <div className="panel corner p-6">
+        <div className="display gold text-lg mb-1">Sun-Earth Lagrange Points</div>
+        <div className="body text-xs muted mb-4" style={{ maxWidth: 720 }}>
+          Five gravitational equilibrium points in the Sun-Earth system. L4 and L5
+          are stable; L1, L2 and L3 are saddle points requiring active station-keeping.
+        </div>
+        <LagrangeView now={now} />
+      </div>
+    </div>
+  );
+}
+
+function SolarSystemScaleAxis() {
+  const W = 920, H = 200;
+  const padX = 40, padY = 50;
+  const minAU = 0.3, maxAU = 300000;
+  const logMin = Math.log10(minAU), logMax = Math.log10(maxAU);
+  const xScale = (au) => padX + ((Math.log10(au) - logMin) / (logMax - logMin)) * (W - padX * 2);
+  const tickRows = SOLAR_SYSTEM_SCALE_AU;
+
+  // Logarithmic decade ticks
+  const decadeTicks = [];
+  for (let d = -1; d <= 6; d++) decadeTicks.push(Math.pow(10, d));
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%">
+      <defs>
+        <linearGradient id="scale-band" x1="0%" x2="100%" y1="0" y2="0">
+          <stop offset="0%" stopColor="#f0a040" stopOpacity="0.7" />
+          <stop offset="15%" stopColor="#d4b07a" stopOpacity="0.5" />
+          <stop offset="35%" stopColor="#5b9cf7" stopOpacity="0.4" />
+          <stop offset="55%" stopColor="#3060a0" stopOpacity="0.3" />
+          <stop offset="80%" stopColor="#1a3060" stopOpacity="0.25" />
+          <stop offset="100%" stopColor="#0a1428" stopOpacity="0.1" />
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width={W} height={H} fill="var(--bg-base)" />
+
+      {/* Band */}
+      <rect x={padX} y={H / 2 - 12} width={W - padX * 2} height={24} fill="url(#scale-band)" rx="2" />
+
+      {/* Decade ticks */}
+      {decadeTicks.map(d => (
+        <g key={d}>
+          <line x1={xScale(d)} y1={H / 2 - 14} x2={xScale(d)} y2={H / 2 + 14}
+            stroke="var(--frame-border)" strokeWidth="0.4" opacity="0.6" />
+          <text x={xScale(d)} y={H - 18} fontSize="8" fontFamily="JetBrains Mono"
+            fill="var(--text-subtle)" textAnchor="middle">
+            {d >= 10000 ? `${d / 1000}k` : d >= 1 ? d : d.toString()}
+          </text>
+        </g>
+      ))}
+      <text x={W / 2} y={H - 4} fontSize="9" fontFamily="JetBrains Mono"
+        fill="var(--text-muted)" textAnchor="middle" letterSpacing="2">DISTANCE FROM SUN (AU, log scale)</text>
+
+      {/* Labeled markers */}
+      {tickRows.map((row, i) => {
+        const x = xScale(row.value);
+        const above = i % 2 === 0;
+        const labelY = above ? H / 2 - 30 - (i % 4) * 12 : H / 2 + 28 + ((i + 1) % 4) * 12;
+        const tickColor = row.kind === "planet" ? "var(--accent-gold)"
+          : row.kind === "boundary" ? "var(--accent-blue)"
+          : row.kind === "object" ? "var(--accent-purple)"
+          : "var(--accent-green)";
+        return (
+          <g key={i}>
+            <line x1={x} y1={above ? H / 2 - 16 : H / 2 + 16} x2={x} y2={labelY + (above ? 4 : -4)}
+              stroke={tickColor} strokeWidth="0.5" opacity="0.6" strokeDasharray="2 2" />
+            <circle cx={x} cy={H / 2} r="2.4" fill={tickColor} />
+            <text x={x} y={labelY} fontSize="8" fontFamily="JetBrains Mono"
+              fill={tickColor} textAnchor="middle">{row.label}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function LagrangeView({ now }) {
+  const jd = toJulian(now);
+  const positions = useMemo(() => lagrangePositions(jd),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [Math.floor(jd)]
+  );
+
+  // Top-down view of Earth's orbit + Lagrange points labels
+  const W = 600, H = 380;
+  const cx = W / 2, cy = H / 2;
+  const scale = 130; // px per AU
+
+  const proj = (x, y) => [cx + x * scale, cy - y * scale];
+  const [eX, eY] = proj(Math.cos(toJulian(now) * 0) * 1, 0); // Earth not strictly here; use computed lagrange context
+  // Earth from lagrange computation: not provided; just show schematic with current rotation.
+  // Reuse the heliocentric direction from the L4 position relative to L1.
+  const L1 = positions.L1;
+  const L1len = Math.hypot(L1.x, L1.y);
+  const earthX = L1.x / L1len * (L1len + 0.01001);
+  const earthY = L1.y / L1len * (L1len + 0.01001);
+  const [earthPx, earthPy] = proj(earthX, earthY);
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div>
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ background: "var(--bg-base)" }}>
+          {/* Earth's orbital circle */}
+          <circle cx={cx} cy={cy} r={scale * 1.0} fill="none"
+            stroke="var(--frame-border)" strokeWidth="0.5" strokeDasharray="2 3" opacity="0.5" />
+          {/* Sun */}
+          <circle cx={cx} cy={cy} r="10" fill="#ffe48a" />
+          <text x={cx} y={cy + 22} fontSize="9" fontFamily="JetBrains Mono"
+            fill="var(--accent-gold)" textAnchor="middle">SUN</text>
+
+          {/* Earth */}
+          <circle cx={earthPx} cy={earthPy} r="4" fill="#5b9cf7" stroke="var(--accent-gold)" strokeWidth="0.5" />
+          <text x={earthPx} y={earthPy - 8} fontSize="8" fontFamily="JetBrains Mono"
+            fill="#5b9cf7" textAnchor="middle">Earth</text>
+
+          {/* Lagrange points */}
+          {Object.entries(positions).map(([key, p]) => {
+            const meta = LAGRANGE_POINTS.find(m => m.key === key);
+            const [x, y] = proj(p.x, p.y);
+            return (
+              <g key={key}>
+                <circle cx={x} cy={y} r="6" fill={meta.color} opacity="0.18" />
+                <circle cx={x} cy={y} r="3" fill={meta.color} stroke="var(--bg-base)" strokeWidth="0.4" />
+                <text x={x} y={y - 8} fontSize="9" fontFamily="JetBrains Mono"
+                  fill={meta.color} textAnchor="middle" fontWeight="bold">{key}</text>
+              </g>
+            );
+          })}
+        </svg>
+        <div className="mono text-xs muted text-center mt-1">
+          Top-down view (ecliptic north up). Distances exaggerated; in reality L1 / L2 are only ~0.01 AU from Earth.
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {LAGRANGE_POINTS.map(lp => (
+          <div key={lp.key} className="frame p-3" style={{ borderLeft: `3px solid ${lp.color}` }}>
+            <div className="flex items-baseline gap-2">
+              <span className="display text-base" style={{ color: lp.color }}>{lp.key}</span>
+              <span className="mono text-xs muted">— {lp.description}</span>
+            </div>
+            {lp.spacecraft.length > 0 && (
+              <div className="mono text-xs mt-1 secondary">
+                <span className="muted">Spacecraft:</span> {lp.spacecraft.join(" · ")}
+              </div>
+            )}
+            {lp.spacecraft.length === 0 && (
+              <div className="mono text-xs mt-1 subtle italic">No active missions.</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
