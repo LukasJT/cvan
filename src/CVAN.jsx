@@ -19,6 +19,7 @@ import { KpForecast } from "./components/KpForecast.jsx";
 import { Sources } from "./components/Sources.jsx";
 import { FAQ } from "./components/FAQ.jsx";
 import { Solar } from "./components/Solar.jsx";
+import { SolarSystem } from "./components/SolarSystem.jsx";
 
 const WEATHER_HORIZON_DAYS = 16;
 const LOCATION_CACHE_KEY = "cvan-last-location";
@@ -458,6 +459,9 @@ export default function CVAN() {
               <KpForecast kpForecast={kpForecast} coords={coords} />
             )}
             {tab === "solar" && <Solar />}
+            {tab === "solarsystem" && coords && (
+              <SolarSystem coords={coords} now={now} displayTz={displayTz} />
+            )}
             {tab === "constellations" && coords && (
               <Constellations
                 coords={coords}
@@ -534,6 +538,7 @@ const PRIMARY_TABS = [
   ["milkyway", "Milky Way"],
   ["aurora", "Aurora"],
   ["solar", "Solar"],
+  ["solarsystem", "Planets"],
   ["constellations", "Constellations"],
   ["planner", "Planner"],
 ];
