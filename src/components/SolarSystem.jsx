@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   fmtDeg, fmtTime, findEvents, toJulian, azimuthName, fmtTimeTz,
   cloudCoverAt, computeSky, moonPhaseName, MOON_NEGLIGIBLE_ALT_DEG,
@@ -14,28 +14,38 @@ import {
 } from "../planets.js";
 import { DataCell, FactorRow, TimeOffsetSlider, Legend, OutOfRangeNotice } from "./shared.jsx";
 import { planetVerdict, cloudVerdict } from "../verdicts.js";
+import { fetchNeoFeed, fetchRoverInfo, fetchRoverLatestPhotos, MARS_ROVERS, shortSol } from "../nasa.js";
+import { COMETS, cometSnapshot } from "../comets.js";
 
 /* Solar System tab. Top-level sub-nav switches between the All-Planets
    overview (orrery + cards + events) and a per-planet detail page that
    mirrors the Milky Way tab's layout. */
 export function SolarSystem({ coords, now, displayTz, sky, weather, weatherStale }) {
   const [subTab, setSubTab] = useState("all");
+  let content;
+  if (subTab === "all") {
+    content = <AllPlanetsView coords={coords} now={now} displayTz={displayTz} />;
+  } else if (subTab === "neos") {
+    content = <NeosView now={now} displayTz={displayTz} />;
+  } else if (subTab === "comets") {
+    content = <CometsView now={now} coords={coords} />;
+  } else {
+    content = (
+      <PlanetDetail
+        planetKey={subTab}
+        coords={coords}
+        now={now}
+        displayTz={displayTz}
+        sky={sky}
+        weather={weather}
+        weatherStale={weatherStale}
+      />
+    );
+  }
   return (
     <div className="space-y-6">
       <SubTabNav subTab={subTab} setSubTab={setSubTab} />
-      {subTab === "all" ? (
-        <AllPlanetsView coords={coords} now={now} displayTz={displayTz} />
-      ) : (
-        <PlanetDetail
-          planetKey={subTab}
-          coords={coords}
-          now={now}
-          displayTz={displayTz}
-          sky={sky}
-          weather={weather}
-          weatherStale={weatherStale}
-        />
-      )}
+      {content}
     </div>
   );
 }
@@ -46,6 +56,8 @@ function SubTabNav({ subTab, setSubTab }) {
   const items = [
     { key: "all", label: "All", symbol: "·" },
     ...PLANETS.filter(p => p.key !== "earth").map(p => ({ key: p.key, label: p.name, symbol: p.symbol, color: p.color })),
+    { key: "neos",   label: "NEOs",   symbol: "⌀", color: "#e88a4a" },
+    { key: "comets", label: "Comets", symbol: "☄", color: "#9fd7f7" },
   ];
   return (
     <nav className="flex gap-1 flex-wrap items-center border-b pb-2" style={{ borderColor: "var(--panel-border)" }}>
@@ -337,6 +349,7 @@ function PlanetDetail({ planetKey, coords, now, displayTz, sky, weather, weather
           <SaturnExtras now={now} />
         </div>
       )}
+      {planetKey === "mars" && <MarsSurfacePanel />}
 
       {/* Night-by-night altitude chart */}
       <PlanetNightChart planetKey={planetKey} coords={coords} now={now} tzName={tzName} meta={meta} />
@@ -986,5 +999,376 @@ function PhaseGlyph({ illumFrac }) {
         fill="#e9d29a"
       />
     </svg>
+  );
+}
+
+/* ===== NEOs / PHAs tab — NASA NeoWs feed ================================ */
+function NeosView({ now, displayTz }) {
+  const [neos, setNeos] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [phaOnly, setPhaOnly] = useState(false);
+  const [windowDays, setWindowDays] = useState(3);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    const start = new Date(now);
+    const end = new Date(now.getTime() + windowDays * 86400000);
+    fetchNeoFeed(start, end)
+      .then((rows) => { if (!cancelled) { setNeos(rows); setLoading(false); } })
+      .catch((e) => { if (!cancelled) { setError(e.message); setLoading(false); } });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [now.toDateString(), windowDays]);
+
+  const filtered = useMemo(() => {
+    if (!neos) return [];
+    return phaOnly ? neos.filter(n => n.isPHA) : neos;
+  }, [neos, phaOnly]);
+
+  return (
+    <div className="space-y-6">
+      <div className="panel corner p-6">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+          <div>
+            <div className="display gold text-lg">Near-Earth Objects</div>
+            <div className="body text-xs muted mt-1">
+              Live from NASA NeoWs. Close approaches over the next {windowDays} day{windowDays === 1 ? "" : "s"}.
+              PHA = Potentially Hazardous Asteroid (≥ 140 m diameter, comes within 0.05 AU of Earth).
+            </div>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <SegmentedToggle
+              value={windowDays} onChange={setWindowDays}
+              options={[
+                { v: 1, label: "1 day" },
+                { v: 3, label: "3 days" },
+                { v: 7, label: "7 days" },
+              ]}
+            />
+            <label className="mono text-xs flex items-center gap-2" style={{ cursor: "pointer" }}>
+              <input type="checkbox" checked={phaOnly} onChange={(e) => setPhaOnly(e.target.checked)} />
+              <span style={{ color: phaOnly ? "var(--warning)" : "var(--text-muted)" }}>PHA only</span>
+            </label>
+          </div>
+        </div>
+
+        {loading && <div className="mono text-sm muted">Loading NASA NeoWs feed…</div>}
+        {error && (
+          <div className="frame p-3" style={{ borderColor: "var(--error)" }}>
+            <div className="mono text-xs" style={{ color: "var(--error)" }}>NeoWs error: {error}</div>
+            <div className="mono text-xs subtle mt-1">
+              DEMO_KEY allows 50 requests/day per IP. Try again later if you've hit the limit.
+            </div>
+          </div>
+        )}
+
+        {filtered.length > 0 && (
+          <div className="space-y-2">
+            <div className="mono text-xs uppercase muted grid grid-cols-12 gap-2 px-2"
+              style={{ borderBottom: "1px solid var(--frame-border)", paddingBottom: 4 }}>
+              <div className="col-span-3">Approach</div>
+              <div className="col-span-3">Object</div>
+              <div className="col-span-2 text-right">Size</div>
+              <div className="col-span-2 text-right">Miss</div>
+              <div className="col-span-2 text-right">v / mag</div>
+            </div>
+            {filtered.map(n => <NeoRow key={n.id} neo={n} displayTz={displayTz} />)}
+          </div>
+        )}
+
+        {!loading && !error && filtered.length === 0 && (
+          <div className="mono text-sm subtle italic">
+            {phaOnly ? "No PHAs in the current window." : "No close approaches in the current window."}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NeoRow({ neo, displayTz }) {
+  const sizeStr = neo.diamMidM < 100
+    ? `${neo.diamMinM.toFixed(0)}–${neo.diamMaxM.toFixed(0)} m`
+    : `${(neo.diamMinM / 1000).toFixed(2)}–${(neo.diamMaxM / 1000).toFixed(2)} km`;
+
+  const missStr = neo.missDistanceLunar < 10
+    ? `${neo.missDistanceLunar.toFixed(2)} LD`
+    : `${neo.missDistanceAU.toFixed(4)} AU`;
+
+  const dateStr = neo.approachTime.toLocaleDateString([], { month: "short", day: "numeric" });
+  const timeStr = neo.approachTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  return (
+    <div className="grid grid-cols-12 gap-2 px-2 py-2 mono text-xs items-center"
+      style={{
+        borderBottom: "1px solid var(--frame-border)",
+        background: neo.isPHA ? "rgba(217, 106, 58, 0.05)" : "transparent",
+      }}>
+      <div className="col-span-3">
+        <div className="display gold">{dateStr}</div>
+        <div className="subtle">{timeStr}</div>
+      </div>
+      <div className="col-span-3 primary">
+        <div className="flex items-center gap-1">
+          {neo.isPHA && (
+            <span className="pill mono"
+              style={{ background: "var(--warning)", color: "var(--bg-base)", fontSize: "0.55rem", padding: "1px 4px" }}>
+              PHA
+            </span>
+          )}
+          <a href={neo.jplUrl} target="_blank" rel="noopener noreferrer"
+            style={{ color: "var(--accent-gold)", textDecoration: "none" }}>
+            {neo.nameShort}
+          </a>
+        </div>
+      </div>
+      <div className="col-span-2 text-right secondary">{sizeStr}</div>
+      <div className="col-span-2 text-right" style={{ color: neo.missDistanceLunar < 1 ? "var(--warning)" : "var(--text-secondary)" }}>
+        {missStr}
+      </div>
+      <div className="col-span-2 text-right subtle">
+        <div>{neo.velocityKps.toFixed(1)} km/s</div>
+        <div>H {neo.magnitudeH.toFixed(1)}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ===== Comets tab ======================================================== */
+function CometsView({ now, coords }) {
+  const snaps = useMemo(() => COMETS.map(c => cometSnapshot(now, c)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [now.toDateString()]
+  );
+
+  // Sort by absolute days from perihelion (closest first), with current + future
+  // events first within ±90 days.
+  const sorted = [...snaps].sort((a, b) => Math.abs(a.daysFromPerihelion) - Math.abs(b.daysFromPerihelion));
+
+  return (
+    <div className="space-y-6">
+      <div className="panel corner p-6">
+        <div className="display gold text-lg">Notable Comets</div>
+        <div className="body text-xs muted mt-1 mb-4">
+          Hand-curated set of recent / upcoming bright comets, with current ephemeris
+          computed from JPL Keplerian elements (elliptic, near-parabolic, and hyperbolic
+          orbits all supported). Magnitudes use the standard H + 5·log Δ + 2.5·n·log r
+          model — actual brightness can vary by ±2 mag from outbursts and fading.
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {sorted.map(c => <CometCard key={c.designation} c={c} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CometCard({ c }) {
+  const direction = c.daysFromPerihelion < 0
+    ? `${(-c.daysFromPerihelion).toFixed(0)} days before perihelion`
+    : c.daysFromPerihelion < 90
+      ? `${c.daysFromPerihelion.toFixed(0)} days past perihelion`
+      : c.daysFromPerihelion < 365
+        ? `${(c.daysFromPerihelion / 30).toFixed(1)} months past perihelion`
+        : `${(c.daysFromPerihelion / 365).toFixed(1)} years past perihelion`;
+
+  const visibilityHint =
+    c.magnitude < 6 ? "Naked-eye potential"
+    : c.magnitude < 10 ? "Binoculars"
+    : c.magnitude < 14 ? "Small telescope"
+    : "Large telescope only";
+
+  return (
+    <div className="panel corner p-5" style={{ borderTopColor: c.color }}>
+      <div className="flex items-baseline gap-3 mb-2">
+        <span className="display text-2xl" style={{ color: c.color }}>☄</span>
+        <div className="flex-1">
+          <div className="display gold text-base">{c.name}</div>
+          <div className="mono text-xs muted">{c.designation} · discovered {c.discovered}</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <DataCell label="Apparent mag" value={c.magnitude.toFixed(1)} sub={visibilityHint} />
+        <DataCell label="Δ Geo" value={`${c.delta.toFixed(2)} AU`} sub={`r ${c.r.toFixed(2)} AU`} />
+        <DataCell label="Perihelion" value={c.perihelionDate.toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" })}
+          sub={`q = ${c.q.toFixed(3)} AU`} />
+        <DataCell label="Sky position" value={`RA ${(c.ra / 15).toFixed(1)}h`} sub={`Dec ${c.dec >= 0 ? "+" : ""}${c.dec.toFixed(1)}°`} />
+      </div>
+      <div className="mono text-xs subtle italic mb-2">{direction}</div>
+      <div className="body text-xs secondary">{c.notes}</div>
+    </div>
+  );
+}
+
+/* ===== Mars surface panel (rovers) ====================================== */
+function MarsSurfacePanel() {
+  return (
+    <div className="panel corner p-6">
+      <div className="mono text-xs uppercase tracking-widest muted mb-3">Mars Surface · Rovers</div>
+      <div className="body text-xs muted mb-4">
+        Landing-site map (cylindrical projection, 180° W → 180° E). NASA rover photo
+        feeds load on demand below.
+      </div>
+      <MarsMap />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
+        {MARS_ROVERS.map(r => <RoverCard key={r.key} rover={r} />)}
+      </div>
+    </div>
+  );
+}
+
+function MarsMap() {
+  // Cylindrical projection: lon [-180, 180] → x [0, W], lat [-90, 90] → y [H, 0].
+  const W = 720, H = 280;
+  const proj = (lat, lon) => {
+    // Normalize lon to [-180, 180]
+    const lonN = ((lon + 540) % 360) - 180;
+    const x = ((lonN + 180) / 360) * W;
+    const y = ((90 - lat) / 180) * H;
+    return [x, y];
+  };
+  // Subtle latitude band overlay so the polar regions read as such.
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ background: "#3a1d10" }}>
+      {/* Latitude bands */}
+      {[-90, -60, -30, 0, 30, 60, 90].map(lat => (
+        <line key={lat} x1="0" y1={proj(lat, -180)[1]} x2={W} y2={proj(lat, -180)[1]}
+          stroke="#71321a" strokeWidth="0.5" opacity="0.5" />
+      ))}
+      {[-180, -120, -60, 0, 60, 120, 180].map(lon => (
+        <line key={lon} x1={proj(0, lon)[0]} y1="0" x2={proj(0, lon)[0]} y2={H}
+          stroke="#71321a" strokeWidth="0.5" opacity="0.4" />
+      ))}
+      {/* Equator highlight */}
+      <line x1="0" y1={proj(0, -180)[1]} x2={W} y2={proj(0, -180)[1]}
+        stroke="#d4a070" strokeWidth="0.6" strokeDasharray="2 4" opacity="0.5" />
+
+      {/* Polar caps */}
+      <ellipse cx={W / 2} cy={5} rx={W * 0.45} ry={14} fill="#ffffff" opacity="0.18" />
+      <ellipse cx={W / 2} cy={H - 5} rx={W * 0.45} ry={14} fill="#ffffff" opacity="0.18" />
+
+      {/* Major features as labels — rough placeholders */}
+      <text x={proj(0, 0)[0]} y={proj(-5, 0)[1]} fontSize="7" fontFamily="JetBrains Mono"
+        fill="#e8b070" textAnchor="middle" opacity="0.6">Tharsis</text>
+      <text x={proj(0, -65)[0]} y={proj(-15, -65)[1]} fontSize="7" fontFamily="JetBrains Mono"
+        fill="#e8b070" textAnchor="middle" opacity="0.6">Olympus Mons</text>
+      <text x={proj(-14, 175)[0]} y={proj(-14, 175)[1] + 12} fontSize="7" fontFamily="JetBrains Mono"
+        fill="#e8b070" textAnchor="middle" opacity="0.6">Gusev Crater</text>
+      <text x={proj(35, 90)[0]} y={proj(35, 90)[1]} fontSize="7" fontFamily="JetBrains Mono"
+        fill="#e8b070" textAnchor="middle" opacity="0.6">Utopia Planitia</text>
+
+      {/* Rover dots */}
+      {MARS_ROVERS.map(r => {
+        const [x, y] = proj(r.lat, r.lon);
+        const active = r.status === "active";
+        return (
+          <g key={r.key}>
+            {active && (
+              <circle cx={x} cy={y} r="7" fill={r.color} opacity="0.25">
+                <animate attributeName="r" values="5;9;5" dur="2.4s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="0.4;0.05;0.4" dur="2.4s" repeatCount="indefinite" />
+              </circle>
+            )}
+            <circle cx={x} cy={y} r="3" fill={r.color} stroke="#0a0a0a" strokeWidth="0.5" />
+            <text x={x} y={y - 7} fontSize="9" fontFamily="JetBrains Mono"
+              fill={r.color} textAnchor="middle" fontWeight="bold">{r.name}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function RoverCard({ rover }) {
+  const [info, setInfo] = useState(null);
+  const [photo, setPhoto] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+
+  const loadDetails = () => {
+    if (loaded || loading) return;
+    setLoading(true);
+    Promise.all([
+      fetchRoverInfo(rover.key).catch(() => null),
+      fetchRoverLatestPhotos(rover.key).catch(() => []),
+    ]).then(([rInfo, photos]) => {
+      setInfo(rInfo);
+      setPhoto(photos?.[0] ?? null);
+      setLoaded(true);
+      setLoading(false);
+    }).catch((e) => { setError(e.message); setLoading(false); });
+  };
+
+  const statusColor = rover.status === "active" ? "var(--accent-green)"
+    : rover.status === "inactive" ? "var(--warning)" : "var(--text-muted)";
+
+  return (
+    <div className="frame p-4" style={{ borderTopColor: rover.color, borderTop: `2px solid ${rover.color}` }}>
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <div className="display gold text-base">{rover.name}</div>
+          <div className="mono text-xs muted">{rover.operator} · landed {rover.landingDate}</div>
+        </div>
+        <span className="pill mono" style={{
+          background: statusColor, color: "var(--bg-base)",
+          fontSize: "0.55rem", padding: "2px 6px", textTransform: "uppercase",
+        }}>
+          {rover.status}
+        </span>
+      </div>
+
+      <div className="mono text-xs secondary mb-2">
+        {rover.landingSite} · {rover.lat.toFixed(2)}°{rover.lat >= 0 ? "N" : "S"} {rover.lon.toFixed(2)}°E
+      </div>
+      <div className="body text-xs primary mb-3">{rover.missionSummary}</div>
+
+      {!loaded && !loading && !error && (
+        <button className="ghost" onClick={loadDetails}
+          style={{
+            padding: "0.35rem 0.7rem", fontSize: "0.65rem",
+            border: "1px solid var(--frame-border)",
+            background: "transparent", color: "var(--accent-gold)",
+            cursor: "pointer", borderRadius: 2,
+            fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.08em", textTransform: "uppercase",
+          }}>
+          Load NASA status + latest photo
+        </button>
+      )}
+      {loading && <div className="mono text-xs muted italic">Fetching…</div>}
+      {error && <div className="mono text-xs" style={{ color: "var(--error)" }}>{error}</div>}
+
+      {loaded && info && (
+        <div className="mono text-xs space-y-0.5">
+          <div className="flex justify-between">
+            <span className="muted">Max sol</span>
+            <span className="gold">{shortSol(info.max_sol)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="muted">Total photos</span>
+            <span className="gold">{info.total_photos?.toLocaleString() ?? "—"}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="muted">Last earth date</span>
+            <span className="gold">{info.max_date}</span>
+          </div>
+        </div>
+      )}
+
+      {loaded && photo && (
+        <a href={photo.img_src} target="_blank" rel="noopener noreferrer"
+          style={{ display: "block", marginTop: 10 }}>
+          <img src={photo.img_src} alt={`${rover.name} sol ${photo.sol}`}
+            style={{ width: "100%", maxHeight: 200, objectFit: "cover", borderRadius: 2, border: `1px solid ${rover.color}` }} />
+          <div className="mono text-xs subtle mt-1">
+            sol {photo.sol} · {photo.camera?.full_name ?? photo.camera?.name} · {photo.earth_date}
+          </div>
+        </a>
+      )}
+    </div>
   );
 }
