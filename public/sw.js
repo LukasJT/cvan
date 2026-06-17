@@ -8,12 +8,11 @@
      image tiles, Nominatim) is network-first, fall back to cache only
      if offline — we never want to serve a stale Kp / weather reading.
    - Big static deps from CDNs (OSM tiles, leaflet, fonts) cache-first. */
-const CACHE = "cvan-shell-v2";
+const CACHE = "cvan-shell-v3";
 const SHELL = [
-  "/cvan/favicon.svg",
-  "/cvan/manifest.webmanifest",
-  "/cvan/icon-192.png",
-  "/cvan/icon-512.png",
+  "/manifest.webmanifest",
+  "/icon-192.png",
+  "/icon-512.png",
 ];
 
 const LIVE_HOSTS = [
