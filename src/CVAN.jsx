@@ -20,6 +20,7 @@ import { Sources } from "./components/Sources.jsx";
 import { FAQ } from "./components/FAQ.jsx";
 import { Solar } from "./components/Solar.jsx";
 import { SolarSystem } from "./components/SolarSystem.jsx";
+import { DeepSky } from "./components/DeepSky.jsx";
 
 const WEATHER_HORIZON_DAYS = 16;
 const LOCATION_CACHE_KEY = "cvan-last-location";
@@ -469,6 +470,16 @@ export default function CVAN() {
                 weatherStale={!weather}
               />
             )}
+            {tab === "deepsky" && coords && (
+              <DeepSky
+                coords={coords}
+                now={now}
+                sky={skyWithEvents}
+                bortle={bortle ?? 5}
+                weather={weather}
+                weatherStale={!weather}
+              />
+            )}
             {tab === "constellations" && coords && (
               <Constellations
                 coords={coords}
@@ -546,6 +557,7 @@ const PRIMARY_TABS = [
   ["aurora", "Aurora"],
   ["solar", "Solar"],
   ["solarsystem", "Planets"],
+  ["deepsky", "Deep Sky"],
   ["constellations", "Constellations"],
   ["planner", "Planner"],
 ];
