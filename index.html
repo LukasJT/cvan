@@ -3,22 +3,141 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="description" content="CVAN — Celestial Visibility Analysis Network. Stargazing conditions, Milky Way and aurora forecasting using NOAA SWPC, NOAA VIIRS, and Open-Meteo." />
-    <meta name="theme-color" content="#0d1b3d" />
 
-    <!-- iOS / Android PWA -->
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- Primary SEO -->
+    <title>CVAN · Stargazing forecast, Milky Way + aurora visibility — Celestial Visibility Analysis Network</title>
+    <meta name="description" content="Real-time stargazing forecast for any location: Milky Way visibility, aurora Kp forecast, Bortle light-pollution class, planet positions, deep-sky catalogs, Hubble + JWST imagery, NEOs, comets, dwarf planets, and live transient events. Free, open data from NOAA, NASA, JPL, and Open-Meteo." />
+    <meta name="keywords" content="stargazing, astronomy, milky way visibility, aurora forecast, Kp index, Bortle scale, light pollution, planets tonight, Messier catalog, NGC, deep sky, dark sky, ISS pass, NEO tracker, comet ephemeris, Jupiter, Saturn, Mars, JWST, Hubble, celestial visibility, planetarium" />
+    <meta name="author" content="LukasJT" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="googlebot" content="index, follow" />
+    <link rel="canonical" href="https://celestialvisibility.com/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="CVAN — Celestial Visibility Analysis Network" />
+    <meta property="og:title" content="CVAN — stargazing, Milky Way + aurora forecast for your location" />
+    <meta property="og:description" content="Live sky conditions, Milky Way and aurora forecasts, planet positions, deep-sky catalogs, Hubble + JWST imagery, NEOs, comets, dwarf planets, and transient events — all from real-time NOAA, NASA, and JPL data." />
+    <meta property="og:url" content="https://celestialvisibility.com/" />
+    <meta property="og:image" content="https://celestialvisibility.com/icon-512.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:alt" content="CVAN insignia on a deep blue night-sky background" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CVAN — stargazing + aurora forecast" />
+    <meta name="twitter:description" content="Live Milky Way, aurora, planets, deep-sky catalogs and transient events for any location on Earth." />
+    <meta name="twitter:image" content="https://celestialvisibility.com/icon-512.png" />
+    <meta name="twitter:image:alt" content="CVAN insignia on a deep blue night-sky background" />
+
+    <!-- Theme + favicons -->
+    <meta name="theme-color" content="#0d1b3d" />
+    <meta name="color-scheme" content="dark" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- iOS / Android PWA -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="CVAN" />
+    <meta name="application-name" content="CVAN" />
 
-    <title>CVAN · Celestial Visibility Analysis Network</title>
+    <!-- Performance: preconnect to the live data hosts we hit on every load -->
+    <link rel="preconnect" href="https://services.swpc.noaa.gov" crossorigin />
+    <link rel="preconnect" href="https://api.open-meteo.com" crossorigin />
+    <link rel="preconnect" href="https://api.nasa.gov" crossorigin />
+    <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin />
+    <link rel="dns-prefetch" href="https://djlorenz.github.io" />
+    <link rel="dns-prefetch" href="https://gibs.earthdata.nasa.gov" />
+
+    <!-- JSON-LD: WebApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "CVAN — Celestial Visibility Analysis Network",
+      "alternateName": "CVAN",
+      "url": "https://celestialvisibility.com/",
+      "image": "https://celestialvisibility.com/icon-512.png",
+      "applicationCategory": "EducationApplication",
+      "applicationSubCategory": "Astronomy",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Modern browser with JavaScript",
+      "description": "A real-time stargazing planner. Computes Milky Way visibility, aurora Kp forecasts, Bortle light-pollution class, planet positions, deep-sky catalogs, Hubble + JWST imagery, near-Earth objects, comets, dwarf planets, and live transient events using public data from NOAA, NASA, JPL, and Open-Meteo.",
+      "isAccessibleForFree": true,
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "creator": {
+        "@type": "Person",
+        "name": "LukasJT",
+        "url": "https://github.com/LukasJT"
+      },
+      "datePublished": "2025-01-01",
+      "inLanguage": "en",
+      "featureList": [
+        "Milky Way visibility forecast",
+        "Aurora Kp index forecast",
+        "Light pollution / Bortle classification",
+        "Cloud cover and weather forecast",
+        "Sun and moon rise / set / twilight",
+        "Planet positions and rise / transit / set times",
+        "Galilean moons configuration",
+        "Saturn ring tilt",
+        "Jupiter Great Red Spot transits",
+        "Planetary conjunctions, oppositions, and elongations",
+        "Mercury and Venus solar transits",
+        "Near-Earth objects and potentially hazardous asteroids",
+        "Comet ephemeris and current positions",
+        "Mars rover positions and latest photos",
+        "Dwarf planets, centaurs, trans-Neptunian objects",
+        "Sun-Earth Lagrange points",
+        "Messier, Caldwell, NGC, IC, and Barnard catalogs",
+        "Surface brightness and best-tonight recommender",
+        "Hubble and JWST iconic image overlay",
+        "Pulsars, black holes, Local Group galaxies",
+        "Live transient events (supernovae, gravitational waves, FRBs, GRBs)"
+      ]
+    }
+    </script>
+
+    <!-- JSON-LD: Organization / WebSite for site links search box -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Celestial Visibility Analysis Network",
+      "alternateName": "CVAN",
+      "url": "https://celestialvisibility.com/"
+    }
+    </script>
   </head>
   <body>
+    <!-- Crawler-visible fallback: described content for search engines and
+         users without JavaScript. The React app replaces this on hydrate. -->
+    <noscript>
+      <main style="font-family: system-ui, sans-serif; max-width: 720px; margin: 4rem auto; padding: 0 1.5rem; color: #e8e8e8; background: #050914;">
+        <h1>CVAN — Celestial Visibility Analysis Network</h1>
+        <p>A real-time stargazing planner computing Milky Way visibility, aurora Kp forecasts, Bortle light pollution class, planet and moon positions, deep-sky catalogs, Hubble + JWST imagery, comets, near-Earth objects, dwarf planets, pulsars, black holes, and live transient events.</p>
+        <h2>Data sources</h2>
+        <ul>
+          <li>NOAA Space Weather Prediction Center (Kp, aurora oval)</li>
+          <li>NOAA VIIRS Day-Night Band (light pollution)</li>
+          <li>Open-Meteo (cloud cover, visibility)</li>
+          <li>NASA NeoWs, Mars Photo API, and JPL ephemerides</li>
+          <li>ESA Hubble and STScI image archives</li>
+        </ul>
+        <p>Please enable JavaScript to use the interactive app.</p>
+      </main>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>

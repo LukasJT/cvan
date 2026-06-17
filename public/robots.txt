@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+
+# Encourage crawlers — the JSON-LD blocks in / describe a real WebApplication
+# and the static index.html includes a <noscript> fallback summary.
+Sitemap: https://celestialvisibility.com/sitemap.xml
