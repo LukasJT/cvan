@@ -21,6 +21,7 @@ export const DSO_TYPES = {
   NEB: { key: "NEB", label: "Diffuse nebula",    color: "#d96a6a" },
   PN:  { key: "PN",  label: "Planetary nebula",  color: "#8fd7e8" },
   SNR: { key: "SNR", label: "Supernova remnant", color: "#e64a4a" },
+  DN:  { key: "DN",  label: "Dark nebula",       color: "#202030" },
   ASTR:{ key: "ASTR",label: "Asterism / double", color: "#dcd0b0" },
 };
 
@@ -181,6 +182,28 @@ export const NGC_IC = [
   { id: "NGC 5139", catalog:"NGC", name: "Omega Centauri",       type: "GC",  ra: 201.70, dec: -47.48, mag: 3.7, size: 55, constellation: "Centaurus", distLY: 17000 },
 ];
 
+/* Barnard catalog — dark nebulae silhouetted against the Milky Way. Sizes
+   are average dimensions in arcmin; magnitudes are nominal (these are
+   ABSENCES of light, so they read as obscured regions rather than glowing
+   sources — "mag" here is a useful sort hint, not a true integrated value).
+   Picked the most photographically prominent objects. */
+export const BARNARD = [
+  { id: "B33",  name: "Horsehead Nebula",     type: "DN", ra:  85.275, dec: -2.450, mag: 11.0, size:  6, constellation: "Orion",       distLY: 1500, note: "Silhouetted against IC 434." },
+  { id: "B59",  name: "Pipe Nebula (stem)",   type: "DN", ra: 261.96,  dec:-23.50,  mag:  4.0, size: 75, constellation: "Ophiuchus",   distLY:  500, note: "Bowl of the Pipe Nebula complex." },
+  { id: "B68",  name: "Black Cloud",          type: "DN", ra: 260.21,  dec:-23.83,  mag:  6.0, size:  5, constellation: "Ophiuchus",   distLY:  500, note: "Compact Bok globule." },
+  { id: "B72",  name: "Snake Nebula",         type: "DN", ra: 259.84,  dec:-23.65,  mag:  6.0, size: 30, constellation: "Ophiuchus",   distLY:  650, note: "S-shaped streamer." },
+  { id: "B78",  name: "Pipe Nebula (bowl)",   type: "DN", ra: 264.50,  dec:-26.50,  mag:  5.0, size:200, constellation: "Ophiuchus",   distLY:  500, note: "Wide field; visible naked-eye from dark sites." },
+  { id: "B84",  name: "",                     type: "DN", ra: 266.16,  dec:-19.80,  mag:  7.0, size: 12, constellation: "Sagittarius", distLY: 1500 },
+  { id: "B85",  name: "",                     type: "DN", ra: 270.25,  dec:-23.20,  mag:  7.0, size:  6, constellation: "Sagittarius", distLY: 4500, note: "Within the Trifid Nebula M20." },
+  { id: "B86",  name: "Ink Spot",             type: "DN", ra: 273.55,  dec:-27.85,  mag:  9.0, size:  5, constellation: "Sagittarius", distLY: 5000, note: "Adjacent to NGC 6520 open cluster." },
+  { id: "B92",  name: "",                     type: "DN", ra: 275.79,  dec:-18.13,  mag:  9.0, size: 15, constellation: "Sagittarius", distLY: 5000, note: "Dark patch in Sagittarius Star Cloud (M24)." },
+  { id: "B142", name: "Barnard's E (north)",  type: "DN", ra: 296.21,  dec: 10.71,  mag:  9.0, size: 60, constellation: "Aquila",      distLY: 2000 },
+  { id: "B143", name: "Barnard's E (south)",  type: "DN", ra: 296.20,  dec: 10.97,  mag:  9.0, size: 30, constellation: "Aquila",      distLY: 2000, note: "Forms the 'E' shape with B142." },
+  { id: "B168", name: "Cocoon dark lane",     type: "DN", ra: 328.00,  dec: 47.18,  mag:  9.0, size: 90, constellation: "Cygnus",      distLY: 2000, note: "Long dark lane near IC 5146 Cocoon." },
+  { id: "B335", name: "",                     type: "DN", ra: 294.25,  dec:  7.59,  mag:  9.5, size:  3, constellation: "Aquila",      distLY:  350, note: "Bok globule with embedded protostar." },
+  { id: "B352", name: "",                     type: "DN", ra: 314.92,  dec: 45.13,  mag:  9.0, size: 20, constellation: "Cygnus",      distLY: 2000 },
+];
+
 /* Annotate Messier and Caldwell with catalog tags + a unified type label. */
 function tag(rows, catalog) {
   return rows.map(r => ({
@@ -195,6 +218,7 @@ export const ALL_DSO = [
   ...tag(MESSIER, "Messier"),
   ...tag(CALDWELL, "Caldwell"),
   ...tag(NGC_IC.map(r => ({ ...r, catalog: r.catalog })), null),
+  ...tag(BARNARD, "Barnard"),
 ];
 
 /* Surface brightness in mag / arcmin² for an object of magnitude `mag`

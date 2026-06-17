@@ -6,6 +6,7 @@ import {
 import { DataCell, FactorRow, OutOfRangeNotice, TimeOffsetSlider, Legend } from "./shared.jsx";
 import { milkyWayVerdict, cloudVerdict } from "../verdicts.js";
 import { AltitudeChart } from "./Overview.jsx";
+import { MilkyWayArch } from "./MilkyWayArch.jsx";
 
 const MAX_HOURS = 7 * 24; // one week
 
@@ -133,6 +134,25 @@ export function MilkyWay({ sky, weather, bortle, bortleAuto, curve, coords, now,
             note={`Core at ${fmtDeg(previewSky.coreHz.alt)} altitude, ${fmtDeg(previewSky.coreHz.az)} azimuth (${azimuthName(previewSky.coreHz.az)}). Higher altitude = thinner atmosphere = more contrast. Best viewing >30°.`} />
         </div>
         {(weatherStale && isNowPreview) && <OutOfRangeNotice what="Cloud cover forecast" horizon="16 days from today" />}
+      </div>
+
+      <div className="panel corner p-6">
+        <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
+          <div className="mono text-xs uppercase tracking-widest muted">
+            Milky Way Arch · sky right now
+          </div>
+          <div className="mono text-xs subtle">
+            zenith centre · horizon outer ring · galactic centre highlighted
+          </div>
+        </div>
+        <MilkyWayArch coords={coords} now={now ?? new Date()} />
+        <div className="mono text-xs subtle mt-3">
+          Planetarium projection from the observer's location, with the bright Milky Way
+          band sampled along its galactic equator (b = 0). Use the panorama tilt angle
+          to align your camera rotation when stitching wide-field shots — the band's
+          position angle near the local meridian is what determines whether your pano
+          will end up level or canted.
+        </div>
       </div>
 
       <MilkyWayNightChart coords={coords} now={now ?? new Date()} tzName={tzName} />
