@@ -8,6 +8,7 @@ import {
   MESSIER, CALDWELL, NGC_IC, ALL_DSO, DSO_TYPES,
   surfaceBrightness, surfaceBrightnessTier, magnitudeLimitForAperture,
 } from "../deepSky.js";
+import { TELESCOPE_IMAGES, telescopeImageCounts } from "../telescopeImages.js";
 
 const CATALOGS = [
   { key: "best",   label: "Best tonight" },
@@ -15,6 +16,7 @@ const CATALOGS = [
   { key: "Messier",label: "Messier" },
   { key: "Caldwell",label: "Caldwell" },
   { key: "ngcic",  label: "NGC / IC" },
+  { key: "telescope", label: "Hubble / JWST" },
 ];
 
 /* Default type filters — start with everything on. */
@@ -63,10 +65,134 @@ export function DeepSky({ coords, now, sky, bortle, weather, weatherStale }) {
 
       {subTab === "best" ? (
         <BestTonight rows={filtered} observer={observer} now={now} sky={sky} bortle={bortle} cloud={cloud} scopeMm={scopeMm} />
+      ) : subTab === "telescope" ? (
+        <TelescopeGallery observer={observer} now={now} />
       ) : (
         <ObjectTable rows={filtered} observer={observer} now={now} scopeMm={scopeMm} />
       )}
     </div>
+  );
+}
+
+/* Iconic Hubble + JWST imagery, click-through to the official press pages.
+   Filterable by telescope; sortable optionally — kept compact since the
+   curated set is small. */
+function TelescopeGallery({ observer, now }) {
+  const [filterTel, setFilterTel] = useState("all");
+  const counts = telescopeImageCounts();
+  const jd = toJulian(now);
+  const sidereal = observer ? lst(jd, observer.lon) : null;
+
+  const items = useMemo(() => {
+    return TELESCOPE_IMAGES.filter(t => filterTel === "all" || t.telescope.toLowerCase() === filterTel)
+      .map(t => {
+        let altNow = null, azNow = null;
+        if (observer && sidereal != null) {
+          const hz = equatorialToHorizontal(t.ra, t.dec, sidereal, observer.lat);
+          altNow = hz.alt;
+          azNow = hz.az;
+        }
+        return { ...t, altNow, azNow };
+      });
+  }, [filterTel, observer?.lat, observer?.lon, sidereal]);
+
+  return (
+    <div className="space-y-4">
+      <div className="panel corner p-4">
+        <div className="flex items-baseline justify-between flex-wrap gap-3">
+          <div>
+            <div className="display gold text-base">Hubble &amp; JWST iconic imagery</div>
+            <div className="body text-xs muted mt-1">
+              {counts.hubble} Hubble + {counts.jwst} JWST press releases, with the sky
+              position of each target. Click any tile for the full-resolution release page.
+            </div>
+          </div>
+          <div className="flex gap-1">
+            {[
+              { v: "all",    label: `All (${counts.total})` },
+              { v: "hubble", label: `Hubble (${counts.hubble})` },
+              { v: "jwst",   label: `JWST (${counts.jwst})` },
+            ].map(opt => (
+              <button key={opt.v}
+                onClick={() => setFilterTel(opt.v)}
+                className="ghost"
+                style={{
+                  padding: "0.3rem 0.6rem",
+                  border: "1px solid",
+                  borderColor: filterTel === opt.v ? "var(--accent-gold)" : "var(--frame-border)",
+                  background: filterTel === opt.v ? "var(--strip-bg)" : "transparent",
+                  color: filterTel === opt.v ? "var(--accent-gold)" : "var(--text-muted)",
+                  cursor: "pointer",
+                  borderRadius: 2,
+                  fontFamily: "JetBrains Mono, monospace",
+                  fontSize: "0.65rem",
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {items.map(img => <TelescopeCard key={img.id} img={img} />)}
+      </div>
+    </div>
+  );
+}
+
+function TelescopeCard({ img }) {
+  const teleColor = img.telescope === "JWST" ? "#e89a5a" : "#5b9cf7";
+  return (
+    <a href={img.page} target="_blank" rel="noopener noreferrer"
+      className="panel corner p-0"
+      style={{
+        textDecoration: "none",
+        borderTop: `2px solid ${teleColor}`,
+        display: "block",
+        overflow: "hidden",
+      }}>
+      <div style={{
+        width: "100%",
+        aspectRatio: "16 / 10",
+        background: "linear-gradient(135deg, #0a0e1a, #1a2030)",
+        overflow: "hidden",
+        position: "relative",
+      }}>
+        <img src={img.thumb} alt={img.target}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          style={{
+            width: "100%", height: "100%", objectFit: "cover",
+            display: "block",
+          }}
+          onError={(e) => { e.currentTarget.style.display = "none"; }} />
+        <span style={{
+          position: "absolute", top: 8, right: 8,
+          padding: "2px 6px",
+          background: teleColor, color: "var(--bg-base)",
+          fontFamily: "JetBrains Mono, monospace",
+          fontSize: "0.55rem", letterSpacing: "0.08em",
+          textTransform: "uppercase", borderRadius: 2,
+        }}>{img.telescope} · {img.year}</span>
+      </div>
+      <div className="p-4">
+        <div className="display gold text-base">{img.target}</div>
+        <div className="mono text-xs muted mb-2">{img.constellation} · {img.instrument}</div>
+        <div className="body text-xs primary" style={{ lineHeight: 1.5 }}>{img.description}</div>
+        {img.altNow != null && (
+          <div className="mono text-xs subtle mt-3">
+            sky right now: {img.altNow > 0
+              ? <span style={{ color: img.altNow > 30 ? "var(--accent-green)" : "var(--accent-gold)" }}>
+                  {fmtDeg(img.altNow)} alt · {azimuthName(img.azNow)} {fmtDeg(img.azNow)}
+                </span>
+              : <span className="muted">below horizon</span>}
+          </div>
+        )}
+      </div>
+    </a>
   );
 }
 
