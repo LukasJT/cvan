@@ -7,11 +7,13 @@ import {
   LOCAL_GROUP, LOCAL_GROUP_CLASSES,
   raDecDistanceToCartesian,
 } from "../exotica.js";
+import { TRANSIENT_EVENTS, TRANSIENT_TYPES, LIVE_FEEDS } from "../transients.js";
 
 const SUB_TABS = [
   { key: "pulsars", label: "Pulsars" },
   { key: "bh",      label: "Black Holes" },
   { key: "lg",      label: "Local Group" },
+  { key: "trans",   label: "Transients" },
 ];
 
 export function Exotica({ coords, now }) {
@@ -42,6 +44,107 @@ export function Exotica({ coords, now }) {
       {subTab === "pulsars" && <PulsarsView coords={coords} now={now} />}
       {subTab === "bh"      && <BlackHolesView coords={coords} now={now} />}
       {subTab === "lg"      && <LocalGroupView />}
+      {subTab === "trans"   && <TransientsView />}
+    </div>
+  );
+}
+
+/* ---- Transient events ---- */
+function TransientsView() {
+  const [filterType, setFilterType] = useState("all");
+
+  const sorted = useMemo(() => {
+    const rows = filterType === "all"
+      ? TRANSIENT_EVENTS
+      : TRANSIENT_EVENTS.filter(e => e.type === filterType);
+    return [...rows].sort((a, b) => b.date.localeCompare(a.date));
+  }, [filterType]);
+
+  return (
+    <div className="space-y-4">
+      <div className="panel corner p-4">
+        <div className="flex items-baseline justify-between flex-wrap gap-3">
+          <div>
+            <div className="display gold text-base">Transient Events</div>
+            <div className="body text-xs muted mt-1" style={{ maxWidth: 720 }}>
+              Curated highlights from the four major transient feeds. Each row links
+              to its live catalog for up-to-the-minute alerts — TNS for supernovae,
+              GraceDB for gravitational waves, CHIME/FRB for fast radio bursts,
+              and NASA GCN for gamma-ray bursts.
+            </div>
+          </div>
+          <TypeFilter activeType={filterType} setActiveType={setFilterType} />
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
+          {Object.values(TRANSIENT_TYPES).map(t => (
+            <a key={t.key} href={LIVE_FEEDS[t.key].url} target="_blank" rel="noopener noreferrer"
+              className="frame p-3" style={{
+                borderLeft: `3px solid ${t.color}`,
+                textDecoration: "none",
+              }}>
+              <div className="mono text-xs uppercase muted">{t.label}</div>
+              <div className="display gold text-sm">{LIVE_FEEDS[t.key].name}</div>
+              <div className="mono text-xs subtle mt-1">live feed →</div>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {sorted.map(ev => <TransientRow key={ev.id} ev={ev} />)}
+      </div>
+    </div>
+  );
+}
+
+function TransientRow({ ev }) {
+  const meta = TRANSIENT_TYPES[ev.type];
+  const detail = ev.type === "SN" ? `peak mag ${ev.peakMag} · host ${ev.host}`
+    : ev.type === "GW" ? `${ev.distMly} Mly · ${ev.source}`
+    : ev.type === "FRB" ? `fluence ${ev.fluence} Jy ms · host ${ev.host}`
+    : ev.type === "GRB" ? `E_iso ≈ ${ev.energyErg.toExponential(1)} erg`
+    : "";
+  return (
+    <div className="frame p-3" style={{ borderLeft: `3px solid ${meta.color}` }}>
+      <div className="flex items-baseline justify-between gap-3 flex-wrap mb-1">
+        <div className="flex items-baseline gap-2">
+          <span className="pill mono" style={{
+            background: meta.color, color: "var(--bg-base)",
+            fontSize: "0.55rem", padding: "1px 5px",
+          }}>{meta.label}</span>
+          <span className="display gold text-base">{ev.id}</span>
+        </div>
+        <div className="mono text-xs muted">
+          {ev.date} · RA {(ev.ra / 15).toFixed(2)}h, Dec {ev.dec >= 0 ? "+" : ""}{ev.dec.toFixed(1)}°
+        </div>
+      </div>
+      <div className="mono text-xs primary mb-1">{detail}</div>
+      <div className="body text-xs subtle italic">{ev.note}</div>
+    </div>
+  );
+}
+
+function TypeFilter({ activeType, setActiveType }) {
+  const opts = [{ key: "all", label: "All", color: "var(--accent-gold)" },
+    ...Object.values(TRANSIENT_TYPES)];
+  return (
+    <div className="flex gap-1 flex-wrap">
+      {opts.map(opt => (
+        <button key={opt.key} onClick={() => setActiveType(opt.key)} className="ghost"
+          style={{
+            padding: "0.3rem 0.6rem",
+            border: "1px solid",
+            borderColor: activeType === opt.key ? opt.color : "var(--frame-border)",
+            background: activeType === opt.key ? "var(--strip-bg)" : "transparent",
+            color: activeType === opt.key ? opt.color : "var(--text-muted)",
+            cursor: "pointer", borderRadius: 2,
+            fontFamily: "JetBrains Mono, monospace",
+            fontSize: "0.65rem", letterSpacing: "0.08em", textTransform: "uppercase",
+          }}>
+          {opt.label}
+        </button>
+      ))}
     </div>
   );
 }
