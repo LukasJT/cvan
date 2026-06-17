@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+    <title>FAQ — Stargazing, Milky Way, aurora, and planets · CVAN</title>
+    <meta name="description" content="Answers to the most common questions about stargazing, Milky Way visibility, the Bortle dark-sky scale, aurora forecasts, planet positions, NEOs, and how the CVAN forecast works." />
+    <meta name="keywords" content="stargazing FAQ, Milky Way visibility, Bortle scale, aurora borealis forecast, planets visible tonight, Andromeda galaxy, light pollution, dark sky" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://celestialvisibility.com/faq/" />
+    <link rel="alternate" hreflang="en" href="https://celestialvisibility.com/faq/" />
+    <link rel="alternate" hreflang="x-default" href="https://celestialvisibility.com/faq/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="CVAN — Celestial Visibility Analysis Network" />
+    <meta property="og:title" content="Stargazing FAQ — CVAN" />
+    <meta property="og:description" content="Common questions about stargazing, the Milky Way, aurora forecasts, Bortle, planets, and observing technique." />
+    <meta property="og:url" content="https://celestialvisibility.com/faq/" />
+    <meta property="og:image" content="https://celestialvisibility.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Stargazing FAQ — CVAN" />
+    <meta name="twitter:description" content="Common questions about stargazing, the Milky Way, aurora forecasts, Bortle, planets, and observing technique." />
+    <meta name="twitter:image" content="https://celestialvisibility.com/og-image.png" />
+
+    <meta name="theme-color" content="#0d1b3d" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="stylesheet" href="/content.css" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "When is the best time to see the Milky Way?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The bright galactic-centre region of the Milky Way is best viewed from mid-March to mid-October in the Northern Hemisphere and year-round closer to the southern Tropics. The single best time on any night is during astronomical night (sun more than 18° below the horizon), with the moon below the horizon, and the core itself above ~20° altitude. CVAN's Milky Way tab shows the next viewable window automatically based on your location."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What does Bortle 5 mean?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Bortle Class 5 is the 'Suburban Sky' tier on the 9-step Bortle dark-sky scale. The Milky Way is visible overhead but washed out near the horizon, only the brightest Messier objects are visible naked-eye, and the sky brightness measured at zenith is roughly 19.1 to 20.4 mag per arcsec². It's typical of outer suburbs around medium-sized cities."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I see the aurora from my location?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Whether you can see the aurora depends on your geomagnetic latitude and the current Kp index. At Kp 3 you need to be above ~63° geomagnetic latitude; at Kp 5 (geomagnetic storm) the viewing line drops to ~56°; and at Kp 7 or higher aurora can be visible from mid-latitude US states and central Europe. CVAN's aurora tab compares your geomagnetic latitude (computed via the IGRF-13 dipole) to the live NOAA SWPC Kp index and tells you whether tonight is viable."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Which planets are visible tonight?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Mercury, Venus, Mars, Jupiter, and Saturn are all visible to the naked eye when above the horizon during twilight or night. Uranus and Neptune require binoculars or a telescope. CVAN's Planets tab shows current altitude, magnitude, distance, and rise/set times for every planet from your location, ranks the brightest one currently above the horizon, and provides detailed per-planet pages with night-by-night altitude charts."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How accurate is CVAN's planet-position data?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Planet positions are computed from JPL's Keplerian element tables (Standish, JPL Solar System Dynamics), which are accurate to about 1 arc-minute for inner planets and a few arc-minutes for the outer planets over the period 1800-2050. Sun and moon positions use Meeus's algorithms accurate to better than 1 arc-minute. For most amateur observing — finding a planet, planning a photograph, computing a conjunction — this is well within useful precision."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do I need to create an account?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. CVAN has no accounts, no tracking, and no analytics. It runs entirely in your browser, fetches data directly from public NOAA, NASA, JPL, and Open-Meteo endpoints, and never sends your location to a server we run."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I find the Andromeda Galaxy (M31)?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "From the Northern Hemisphere, Andromeda is best in autumn evenings. Locate the Great Square of Pegasus, then follow the line of stars from the top-left corner (Alpheratz) up through Mirach to find M31 — visible as a fuzzy 3.4-magnitude patch under dark skies. CVAN's Deep Sky tab includes Andromeda with its current altitude and azimuth for your location, and a 'Best Tonight' recommender that ranks it among other targets."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is a Potentially Hazardous Asteroid (PHA)?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A Potentially Hazardous Asteroid is an NEO with an estimated diameter of at least 140 metres that comes within 0.05 AU (about 7.5 million kilometres, or 19 lunar distances) of Earth's orbit. PHAs are tracked by NASA's NeoWs program; CVAN's NEOs tab lists upcoming close approaches with a PHA filter, miss distance in AU or lunar distances, and direct links to JPL's Small-Body Database entry for each one."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is a planetary conjunction, and when is the next one?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A conjunction is when two planets (or a planet and the Moon, or a planet and the Sun) appear close together on the sky — sharing nearly the same ecliptic longitude. CVAN computes all conjunctions tighter than 3° over the next 12 months and lists them in the Planets tab, sorted chronologically with the two bodies, their angular separation, and the date."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What's the dimmest object I can see with binoculars?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Naked-eye limit under dark skies is around magnitude 6.5. With 50-mm binoculars you can typically reach magnitude 9.5; with a 6-inch telescope around 13.5; with a 16-inch under good conditions around 16. The general rule is m_limit ≈ 7.5 + 5 × log10(aperture_mm / 7). CVAN's Deep Sky filter lets you slide a scope aperture and updates the limiting magnitude live."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does CVAN work offline?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Partially. CVAN is a Progressive Web App, so once you've visited it the app shell and the static catalogs (Messier, Caldwell, planet ephemerides, etc.) keep working without an internet connection. Live data — current Kp, cloud cover, NEO feed, Mars rover photos — needs network. You can install it to your home screen on iOS and Android."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is the Galactic Centre and when is it visible?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The Galactic Centre is the dense core region of the Milky Way, in the constellation Sagittarius near the Scorpius border. It's the brightest part of the band and the most photographed Milky Way region. From the Northern Hemisphere it transits highest in the south in late July; from the Southern Hemisphere it passes overhead and is visible most of the year. CVAN's Milky Way tab tracks the core's altitude and predicts the next viewable window."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does the aurora forecast work?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Aurora visibility is set primarily by the planetary Kp index — a 0-9 scale derived from magnetometer readings worldwide. NOAA SWPC publishes a real-time Kp value every 5 minutes and a 3-day forecast every 30 minutes. CVAN cross-references the current Kp with the standard auroral-oval viewing latitude table, the geomagnetic latitude of your location (computed via the IGRF-13 dipole), local sun altitude (no aurora visible in daylight), and cloud cover to score tonight's chance."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is light pollution and how is it measured?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Light pollution is artificial-light brightening of the night sky, primarily from street lighting, commercial signage, and atmospheric scattering. It's measured in mag/arcsec² (SQM) — higher numbers mean a darker sky. A pristine site reads about 21.9 SQM; central cities can be below 18.0 SQM. CVAN uses the NOAA VIIRS Day-Night Band radiance for your exact pixel, converts it via the Falchi 2016 empirical fit, and reports both the SQM and the Bortle Class (1-9)."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I avoid the moon for deep-sky observing?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Plan around moonset for evening sessions, or moonrise for morning. Specifically, wait until the moon is below about -5° altitude — at that depth its scattered sky brightening drops below 0.1 mag/arcsec². Or pick a date within four days of the new moon. CVAN's Moon & Sun tab shows the current moon altitude, illumination percentage, and the next 36 hours of moon-sky brightening calculated via the Krisciunas-Schaefer model."
+          }
+        }
+      ]
+    }
+    </script>
+  </head>
+
+  <body>
+    <nav class="breadcrumbs">
+      <a href="/">CVAN</a> / FAQ
+    </nav>
+
+    <header>
+      <div class="crest">
+        <img src="/logo-header.png" alt="CVAN insignia" width="56" height="56" />
+        <div>
+          <div class="brand">CVAN</div>
+          <div class="tag">Frequently Asked Questions</div>
+        </div>
+      </div>
+      <p>
+        Common questions about stargazing, the Milky Way, aurora forecasts,
+        light pollution, planets, deep-sky targets, and how the CVAN
+        forecast works.
+      </p>
+    </header>
+
+    <main>
+      <h2>The basics</h2>
+      <details class="faq">
+        <summary>When is the best time to see the Milky Way?</summary>
+        <div class="answer">
+          <p>The bright galactic-centre region of the Milky Way is best viewed from mid-March to mid-October in the Northern Hemisphere, and year-round closer to the southern Tropics. The single best time on any night is during <strong>astronomical night</strong> (sun more than 18° below the horizon) with the moon below the horizon and the core itself above ~20° altitude.</p>
+          <p>CVAN's <a href="/">Milky Way tab</a> shows the next viewable window automatically based on your location, including a 36-hour altitude chart of the core and a planetarium-style arch view of the band right now.</p>
+          <p>See the full <a href="/guides/milky-way/">Milky Way viewing guide</a> for a season-by-season breakdown.</p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>What does Bortle 5 mean?</summary>
+        <div class="answer">
+          <p>Bortle Class 5 is the <strong>Suburban Sky</strong> tier on the 9-step Bortle dark-sky scale. The Milky Way is visible overhead but washed out near the horizon, only the brightest Messier objects are visible naked-eye, and the sky brightness measured at zenith is roughly 19.1 to 20.4 mag per arcsec². It's typical of outer suburbs around medium-sized cities.</p>
+          <p>See the complete <a href="/guides/bortle-scale/">Bortle scale explainer</a> for what each class actually looks like and how the conversion from VIIRS satellite measurements works.</p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>Can I see the aurora from my location?</summary>
+        <div class="answer">
+          <p>It depends on your geomagnetic latitude and the current Kp index. At Kp 3 you need to be above ~63° geomagnetic latitude; at Kp 5 (geomagnetic storm) the viewing line drops to ~56°; and at Kp 7 or higher aurora can be visible from mid-latitude US states and central Europe.</p>
+          <p>CVAN's <a href="/">aurora tab</a> compares your geomagnetic latitude (computed via the IGRF-13 dipole) to the live NOAA SWPC Kp index, factors in local sun altitude and cloud cover, and tells you whether tonight is viable. See the full <a href="/guides/aurora/">aurora viewing guide</a> for typical Kp thresholds by city.</p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>Which planets are visible tonight?</summary>
+        <div class="answer">
+          <p>Mercury, Venus, Mars, Jupiter, and Saturn are all visible to the naked eye when above the horizon during twilight or night. Uranus and Neptune require binoculars or a telescope.</p>
+          <p>CVAN's <a href="/">Planets tab</a> shows current altitude, magnitude, distance, and rise/set times for every planet from your location, ranks the brightest one currently above the horizon, and provides detailed per-planet pages with night-by-night altitude charts and conditions panels.</p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>How do I find the Andromeda Galaxy (M31)?</summary>
+        <div class="answer">
+          <p>From the Northern Hemisphere, Andromeda is best in autumn evenings. Locate the <strong>Great Square of Pegasus</strong>, then follow the line of stars from the top-left corner (Alpheratz) up through Mirach to find M31 — visible as a fuzzy 3.4-magnitude patch under dark skies; spectacular through binoculars under Bortle 4 or darker.</p>
+          <p>CVAN's <a href="/">Deep Sky tab</a> includes Andromeda with its current altitude and azimuth for your location, and a "Best Tonight" recommender that ranks it against other targets.</p>
+        </div>
+      </details>
+
+      <h2>Observing technique</h2>
+      <details class="faq">
+        <summary>What's the dimmest object I can see with binoculars?</summary>
+        <div class="answer">
+          <p>Naked-eye limit under dark skies is around magnitude 6.5. With 50-mm binoculars you can typically reach magnitude 9.5; with a 6-inch telescope around 13.5; with a 16-inch under good conditions around 16. The general rule is:</p>
+          <p style="font-family: 'JetBrains Mono', monospace; color: var(--accent-gold);">m_limit ≈ 7.5 + 5 × log₁₀(aperture_mm / 7)</p>
+          <p>CVAN's Deep Sky filter lets you slide a scope aperture and updates the limiting magnitude live; objects beyond your scope's reach are greyed out.</p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>How do I avoid the moon for deep-sky observing?</summary>
+        <div class="answer">
+          <p>Plan around moonset for evening sessions, or moonrise for morning. Specifically, wait until the moon is <strong>below about -5° altitude</strong> — at that depth its scattered sky brightening drops below 0.1 mag/arcsec² and is essentially negligible. Alternatively, pick a date within four days of the new moon.</p>
+          <p>CVAN's Moon &amp; Sun tab shows the current moon altitude, illumination percentage, and the next 36 hours of moon-sky brightening calculated via the Krisciunas-Schaefer (1991) model.</p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>What is light pollution and how is it measured?</summary>
+        <div class="answer">
+          <p>Light pollution is artificial-light brightening of the night sky, primarily from street lighting, commercial signage, and atmospheric scattering. It's measured in <strong>mag/arcsec² (SQM)</strong> — higher numbers mean a darker sky. A pristine site reads about 21.9 SQM; central cities can be below 18.0 SQM.</p>
+          <p>CVAN uses the NOAA VIIRS Day-Night Band radiance for your exact pixel, converts it via the Falchi (2016) empirical fit, and reports both the SQM and the Bortle Class (1-9).</p>
+        </div>
+      </details>
+
+      <h2>Planets, comets, and asteroids</h2>
+      <details class="faq">
+        <summary>What is a Potentially Hazardous Asteroid (PHA)?</summary>
+        <div class="answer">
+          <p>A PHA is a near-Earth object with an estimated diameter of at least 140 metres that comes within <strong>0.05 AU</strong> (about 7.5 million kilometres, or 19 lunar distances) of Earth's orbit. PHAs are tracked by NASA's NeoWs program.</p>
+          <p>CVAN's NEOs tab lists upcoming close approaches with a PHA filter, miss distance in AU or lunar distances, and direct links to JPL's Small-Body Database entry for each one.</p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>What is a planetary conjunction, and when is the next one?</summary>
+        <div class="answer">
+          <p>A conjunction is when two planets (or a planet and the Moon, or a planet and the Sun) appear close together on the sky — sharing nearly the same ecliptic longitude. The naked-eye-friendly ones are tighter than about 3°.</p>
+          <p>CVAN computes all such conjunctions over the next 12 months and lists them in the Planets tab, sorted chronologically with the two bodies, their angular separation, and the date.</p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>What is the Galactic Centre and when is it visible?</summary>
+        <div class="answer">
+          <p>The Galactic Centre is the dense core region of the Milky Way, in the constellation <strong>Sagittarius</strong> near the Scorpius border. It's the brightest part of the band and the most photographed Milky Way region.</p>
+          <p>From the Northern Hemisphere it transits highest in the south in late July; from the Southern Hemisphere it passes overhead and is visible most of the year. CVAN's Milky Way tab tracks its altitude and predicts the next viewable window.</p>
+        </div>
+      </details>
+
+      <h2>Forecast methodology</h2>
+      <details class="faq">
+        <summary>How accurate is CVAN's planet-position data?</summary>
+        <div class="answer">
+          <p>Planet positions are computed from JPL's Keplerian element tables (Standish, JPL Solar System Dynamics) which are accurate to about <strong>1 arc-minute</strong> for inner planets and a few arc-minutes for outer planets over the period 1800-2050. Sun and moon positions use Meeus's algorithms accurate to better than 1 arc-minute. For most amateur observing — finding a planet, planning a photograph, computing a conjunction — this is well within useful precision.</p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>How does the aurora forecast work?</summary>
+        <div class="answer">
+          <p>Aurora visibility is set primarily by the planetary Kp index — a 0-9 scale derived from magnetometer readings worldwide. NOAA SWPC publishes a real-time Kp value every 5 minutes and a 3-day forecast every 30 minutes.</p>
+          <p>CVAN cross-references the current Kp with the standard auroral-oval viewing latitude table, the geomagnetic latitude of your location (computed via the IGRF-13 dipole), local sun altitude (no aurora visible in daylight), and cloud cover to score tonight's chance.</p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>Do I need to create an account?</summary>
+        <div class="answer">
+          <p>No. CVAN has no accounts, no tracking, and no analytics. It runs entirely in your browser, fetches data directly from public NOAA, NASA, JPL, and Open-Meteo endpoints, and never sends your location to a server we run.</p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>Does CVAN work offline?</summary>
+        <div class="answer">
+          <p>Partially. CVAN is a Progressive Web App, so once you've visited it the app shell and the static catalogs (Messier, Caldwell, planet ephemerides, etc.) keep working without an internet connection.</p>
+          <p>Live data — current Kp, cloud cover, NEO feed, Mars rover photos — needs network. You can install it to your home screen on iOS and Android for an app-like experience.</p>
+        </div>
+      </details>
+
+      <hr />
+
+      <h2>Explore further</h2>
+      <div class="tile-grid">
+        <a class="tile" href="/guides/milky-way/">
+          <div class="tile-eyebrow">Guide</div>
+          <div class="tile-title">Seeing the Milky Way</div>
+          <div class="tile-body">Season-by-season viewing plan, photography tips, and the role of light pollution.</div>
+        </a>
+        <a class="tile" href="/guides/bortle-scale/">
+          <div class="tile-eyebrow">Guide</div>
+          <div class="tile-title">The Bortle Scale</div>
+          <div class="tile-body">What each class 1-9 actually looks like, and how CVAN computes yours from satellite data.</div>
+        </a>
+        <a class="tile" href="/guides/aurora/">
+          <div class="tile-eyebrow">Guide</div>
+          <div class="tile-title">Catching the Aurora</div>
+          <div class="tile-body">Geomagnetic latitude, Kp thresholds, and best times to look up.</div>
+        </a>
+        <a class="tile" href="/about/">
+          <div class="tile-eyebrow">About</div>
+          <div class="tile-title">How CVAN works</div>
+          <div class="tile-body">Forecast pipeline, data sources, and the methodology references behind every number.</div>
+        </a>
+      </div>
+
+      <a class="cta" href="/">Open the live app →</a>
+    </main>
+
+    <footer>
+      <div class="footer-links">
+        <a href="/">App</a>
+        <a href="/about/">About</a>
+        <a href="/faq/">FAQ</a>
+        <a href="/guides/milky-way/">Milky Way</a>
+        <a href="/guides/bortle-scale/">Bortle</a>
+        <a href="/guides/aurora/">Aurora</a>
+      </div>
+      © Celestial Visibility Analysis Network · Open source on GitHub · No accounts, no tracking
+    </footer>
+  </body>
+</html>
