@@ -319,11 +319,32 @@ export default function CVAN() {
 
       <div className="star-bg" />
 
-      {/* Reserved 160x600 side ad slots — fixed-position, vertically centered.
-          Empty until an ad script is dropped in; the surrounding layout already
-          reserves the gutter so adding ads here later won't reflow the page. */}
-      <aside id="cvan-ad-left" className="cvan-side-ad cvan-side-ad-left" aria-hidden="true"></aside>
-      <aside id="cvan-ad-right" className="cvan-side-ad cvan-side-ad-right" aria-hidden="true"></aside>
+      {/* 160x600 side ad slots — fixed-position, vertically centered.
+          Each ad runs in its own same-origin iframe so the Adsterra
+          `atOptions` global doesn't collide between the two slots and so
+          the referer the ad network sees is celestialvisibility.com. */}
+      <aside id="cvan-ad-left" className="cvan-side-ad cvan-side-ad-left" aria-hidden="true">
+        <iframe
+          src="/ad-160x600.html"
+          width="160"
+          height="600"
+          frameBorder="0"
+          scrolling="no"
+          title="Advertisement"
+          style={{ display: "block", border: 0 }}
+        />
+      </aside>
+      <aside id="cvan-ad-right" className="cvan-side-ad cvan-side-ad-right" aria-hidden="true">
+        <iframe
+          src="/ad-160x600.html"
+          width="160"
+          height="600"
+          frameBorder="0"
+          scrolling="no"
+          title="Advertisement"
+          style={{ display: "block", border: 0 }}
+        />
+      </aside>
 
       <div className="relative max-w-6xl mx-auto px-6 py-8 cvan-main">
 
