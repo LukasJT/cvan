@@ -21,6 +21,7 @@ import { FAQ } from "./components/FAQ.jsx";
 import { Solar } from "./components/Solar.jsx";
 import { SolarSystem } from "./components/SolarSystem.jsx";
 import { DeepSky } from "./components/DeepSky.jsx";
+import { Exotica } from "./components/Exotica.jsx";
 
 const WEATHER_HORIZON_DAYS = 16;
 const LOCATION_CACHE_KEY = "cvan-last-location";
@@ -480,6 +481,9 @@ export default function CVAN() {
                 weatherStale={!weather}
               />
             )}
+            {tab === "exotica" && (
+              <Exotica coords={coords} now={now} />
+            )}
             {tab === "constellations" && coords && (
               <Constellations
                 coords={coords}
@@ -558,6 +562,7 @@ const PRIMARY_TABS = [
   ["solar", "Solar"],
   ["solarsystem", "Planets"],
   ["deepsky", "Deep Sky"],
+  ["exotica", "Exotica"],
   ["constellations", "Constellations"],
   ["planner", "Planner"],
 ];
