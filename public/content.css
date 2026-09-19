@@ -95,6 +95,40 @@ p, ul, ol { margin: 1rem 0; color: var(--text-secondary); }
 ul, ol { padding-left: 1.5rem; }
 li { margin-bottom: 0.35rem; }
 strong { color: var(--text-primary); }
+code {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.9em;
+  color: var(--accent-gold);
+  background: rgba(212, 184, 106, 0.08);
+  border: 1px solid rgba(212, 184, 106, 0.18);
+  border-radius: 3px;
+  padding: 0.08em 0.3em;
+}
+.eyebrow, .article-meta {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.dek { font-size: clamp(1.05rem, 2.4vw, 1.3rem); line-height: 1.55; max-width: 42rem; }
+.toc, .method-note {
+  margin: 2rem 0;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--frame-border);
+  background: rgba(13, 27, 61, 0.28);
+}
+.toc strong { font-family: Cinzel, Georgia, serif; color: var(--accent-gold); }
+.toc ol { columns: 2; column-gap: 2rem; margin-bottom: 0; }
+.toc li { break-inside: avoid; }
+.method-note { border-left: 3px solid var(--accent-gold); }
+.method-note p { margin-bottom: 0.25rem; }
+.table-wrap { overflow-x: auto; margin: 1.25rem 0; }
+table { width: 100%; border-collapse: collapse; font-family: Georgia, serif; color: var(--text-secondary); }
+th, td { padding: 0.7rem 0.75rem; border: 1px solid var(--frame-border); text-align: left; vertical-align: top; }
+th { color: var(--accent-gold); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; background: rgba(13, 27, 61, 0.55); }
+.sources a { overflow-wrap: anywhere; }
+.article-page main section { scroll-margin-top: 1rem; }
 em { color: var(--text-secondary); }
 hr {
   border: 0;
@@ -221,3 +255,11 @@ details.faq > div.answer p:first-child { margin-top: 0; }
 }
 .source-grid dt { color: var(--accent-gold); white-space: nowrap; }
 .source-grid dd { margin: 0; color: var(--text-secondary); }
+
+@media (max-width: 620px) {
+  header, main, footer, nav.breadcrumbs { padding-left: 1rem; padding-right: 1rem; }
+  .brand { font-size: 1.55rem; }
+  h1 { font-size: 1.55rem; }
+  .toc ol { columns: 1; }
+  th, td { padding: 0.6rem; min-width: 9rem; }
+}

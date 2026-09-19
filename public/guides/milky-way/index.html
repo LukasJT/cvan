@@ -80,7 +80,7 @@
         <strong>location</strong>, <strong>sky conditions</strong>, and
         <strong>moon timing</strong>. Plus how to read the live forecast.
       </p>
-      <a class="cta" href="/">Check tonight's Milky Way visibility →</a>
+      <a class="cta" href="/?tab=milkyway&amp;ref=guide-milky-way">Check tonight's Milky Way visibility →</a>
     </header>
 
     <main>
@@ -113,15 +113,17 @@
       <ul>
         <li><strong>February–March</strong>: core rises late, briefly visible before dawn just above the southeastern horizon.</li>
         <li><strong>April–May</strong>: rises mid-night, useful from ~2 AM until dawn.</li>
-        <li><strong>June</strong>: rises early evening, transits south around midnight at low-to-medium altitude. Best window for north-of-40° latitudes.</li>
-        <li><strong>July</strong>: peak season — transits south at the best altitude of the year right around dark, between 11 PM and 1 AM.</li>
+        <li><strong>June</strong>: the core is well placed during the night from many northern locations, though high latitudes may lack astronomical darkness.</li>
+        <li><strong>July</strong>: the core transits earlier in the night. Its maximum altitude is fixed by latitude; the calendar changes when that transit overlaps darkness.</li>
         <li><strong>August</strong>: still excellent; core transits earlier and is well-placed for evening viewing.</li>
         <li><strong>September</strong>: core sinks into the southwest before midnight; last good window of the year.</li>
         <li><strong>October–January</strong>: galactic centre is below the horizon during night — only the anti-centre is visible, which is far fainter and less impressive.</li>
       </ul>
       <p>
-        From the Southern Hemisphere it's better all year — the core passes
-        overhead in winter (May–July) and is visible naked-eye most months.
+        Mid-southern latitudes give the core a much higher path than
+        mid-northern latitudes. Whether it passes overhead depends on the
+        observer's exact latitude, and the useful dark window still changes
+        through the year.
       </p>
 
       <h2>2. Location — finding a dark site</h2>
@@ -138,11 +140,10 @@
         <li><strong>Bortle 6+</strong>: city outskirts and beyond; band invisible.</li>
       </ul>
       <p>
-        For a satellite-derived light-pollution map, CVAN reads the NOAA
-        VIIRS Day-Night Band for your exact pixel and gives you the
-        Bortle Class. See the <a href="/guides/bortle-scale/">Bortle scale guide</a>
-        for what each tier looks like in practice and how the conversion
-        works.
+        CVAN samples a VIIRS-derived modeled atlas tile for your location and
+        reports an approximate zenith-brightness and Bortle-class estimate.
+        This is not a live measurement. See <a href="/guides/light-pollution-maps/">how the map estimate works</a>
+        and the <a href="/guides/bortle-scale/">Bortle scale guide</a>.
       </p>
 
       <h2>3. Sky conditions — twilight, cloud, moon</h2>
@@ -152,9 +153,9 @@
         must be more than 18° below the horizon. Civil twilight (just after
         sunset) is far too bright; even nautical twilight (sun −6 to −12°)
         washes out most of the band. The astronomical-night window
-        shortens at higher latitudes in summer — north of about 49° latitude
-        in June, the sun never gets below −18° at all, and "true" Milky Way
-        viewing is impossible until late July.
+        shortens at higher latitudes in summer. At some locations and dates
+        the Sun never reaches −18°, so astronomical night does not occur.
+        Check the selected location and date rather than relying on one latitude cutoff.
       </p>
       <h3>Cloud cover</h3>
       <p>
@@ -219,7 +220,7 @@
         <dt>Cloud cover target</dt><dd>Below 30%</dd>
       </div>
 
-      <a class="cta" href="/">Open the live Milky Way forecast →</a>
+      <a class="cta" href="/?tab=milkyway&amp;ref=guide-milky-way">Open the live Milky Way forecast →</a>
 
       <h2>Related guides</h2>
       <div class="tile-grid">
@@ -250,7 +251,7 @@
         <a href="/guides/bortle-scale/">Bortle</a>
         <a href="/guides/aurora/">Aurora</a>
       </div>
-      © Celestial Visibility Analysis Network · Open source on GitHub · No accounts, no tracking
+      © Celestial Visibility Analysis Network · Open source astronomy planning
     </footer>
   </body>
 </html>

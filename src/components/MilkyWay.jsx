@@ -76,7 +76,7 @@ export function MilkyWay({ sky, weather, bortle, bortleAuto, curve, coords, now,
             <div className="mono text-xs uppercase tracking-widest muted">Bortle Scale · What You'll See at Class {bortle}</div>
             {bortleAuto && (
               <div className="mono text-xs secondary">
-                MEASURED · SQM <span className="gold">{bortleAuto.sqm.toFixed(2)}</span> · LPI <span className="gold">{bortleAuto.lpi.toFixed(2)}</span>× NATURAL · ZONE <span className="gold">{bortleAuto.zone}</span>
+                ATLAS ESTIMATE · SQM <span className="gold">{bortleAuto.sqm.toFixed(2)}</span> · ARTIFICIAL/NATURAL <span className="gold">{bortleAuto.lpi.toFixed(2)}</span>× · ZONE <span className="gold">{bortleAuto.zone}</span>
               </div>
             )}
           </div>

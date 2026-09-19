@@ -9,6 +9,11 @@ export function cloudVerdict(c) {
 }
 
 export function milkyWayVerdict(sky, bortle, cloud, curve) {
+  if (!Number.isFinite(bortle)) return {
+    rating: "LIGHT DATA UNKNOWN",
+    color: "var(--text-muted)",
+    text: "The light-pollution atlas is unavailable, so CVAN cannot give a complete Milky Way verdict for this location.",
+  };
   if (bortle >= 7) return {
     rating: "INVISIBLE",
     color: "var(--error)",
@@ -23,13 +28,13 @@ export function milkyWayVerdict(sky, bortle, cloud, curve) {
         rating: "BELOW HORIZON",
         color: "var(--text-muted)",
         text: `Galactic core not above horizon now. Next viewable window: ${fmtTime(next.start)} (core reaches ${fmtDeg(next.coreAlt)}).`,
-        note: "Best from May–September in the N. hemisphere; summer months in the S.",
+        note: "The useful season depends on latitude and on when darkness overlaps the core's position.",
       };
     }
     return {
       rating: "BELOW HORIZON",
       color: "var(--text-muted)",
-      text: "Galactic core not above horizon in the next 12 hours. Check seasonal availability — best from May–September in the N. hemisphere.",
+      text: "Galactic core not above the horizon in the next 12 hours. Its seasonal night-time window depends on your latitude.",
     };
   }
 
@@ -61,7 +66,7 @@ export function milkyWayVerdict(sky, bortle, cloud, curve) {
   if (bortle <= 3) {
     return { rating: "EXCELLENT", color: "var(--accent-green)", text: "Dark sky + core up + clear: structured Milky Way visible naked-eye." };
   }
-  return { rating: "VISIBLE", color: "var(--accent-gold)", text: "Core overhead and conditions reasonable. Suburbs see only the brightest sections." };
+  return { rating: "VISIBLE", color: "var(--accent-gold)", text: "The core is above the horizon and conditions are reasonable. Its altitude and local light pollution determine how much structure you can see." };
 }
 
 export function auroraVerdict(aurora, lat, cloud, geomagLat) {
@@ -74,17 +79,18 @@ export function auroraVerdict(aurora, lat, cloud, geomagLat) {
     return {
       rating: "TOO FAR FROM POLE",
       color: "var(--text-muted)",
-      text: `Kp=${kp.toFixed(1)} requires ~${threshold}° geomagnetic latitude. You're at ${compareLat.toFixed(1)}° geomag${geomagLat != null ? "" : " (using geographic)"}.`,
+      text: `At Kp=${kp.toFixed(1)}, the approximate oval boundary is near ${threshold}° geomagnetic latitude. You're at ${compareLat.toFixed(1)}°${geomagLat != null ? " geomagnetic" : " geographic"}; bright aurora can sometimes be seen beyond the oval toward the nearest magnetic pole.`,
     };
   }
   if (cloud != null && cloud > 70) {
-    return { rating: "CLOUDED OUT", color: "var(--warning)", text: `Kp=${kp.toFixed(1)} is workable but ${cloud}% clouds will block view.` };
+    return { rating: "CLOUD LIMITED", color: "var(--warning)", text: `Kp=${kp.toFixed(1)} may be workable, but ${cloud}% forecast cloud cover substantially reduces the chance of a clear view.` };
   }
   if (kp >= 5) {
-    return { rating: "STORM IN PROGRESS", color: "var(--accent-green)", text: `Kp=${kp.toFixed(1)} — geomagnetic storm. Aurora likely visible from your latitude.` };
+    return { rating: "ELEVATED ACTIVITY", color: "var(--accent-green)", text: `Estimated Kp=${kp.toFixed(1)} indicates elevated geomagnetic activity. Visibility still depends on the auroral oval, darkness, clouds, and a clear view toward the nearest magnetic pole.` };
   }
   if (compareLat >= threshold) {
-    return { rating: "POSSIBLE", color: "var(--accent-gold)", text: `Kp=${kp.toFixed(1)} and you're at viewing latitude. Look toward magnetic north.` };
+    const direction = lat < 0 ? "south" : "north";
+    return { rating: "POSSIBLE", color: "var(--accent-gold)", text: `Estimated Kp=${kp.toFixed(1)} places you near the approximate viewing zone. From this hemisphere, start with a clear view toward magnetic ${direction}.` };
   }
   return { rating: "QUIET", color: "var(--text-muted)", text: `Kp=${kp.toFixed(1)} — no significant aurora activity expected.` };
 }

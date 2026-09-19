@@ -15,10 +15,10 @@ const SWPC = "https://services.swpc.noaa.gov";
 const SUVI_CHANNELS = [
   { wl: "094", label: "094 Å · Hot Plasma (~6 MK)", note: "Flares & active regions" },
   { wl: "131", label: "131 Å · Flares (~10 MK)", note: "Hottest flare plasma" },
-  { wl: "171", label: "171 Å · Quiet Corona (~600 K)", note: "Coronal loops" },
+  { wl: "171", label: "171 Å · Quiet Corona (~600,000 K)", note: "Coronal loops" },
   { wl: "195", label: "195 Å · Active Corona (~1.5 MK)", note: "Coronal holes" },
   { wl: "284", label: "284 Å · Active Regions (~2 MK)", note: "Magnetic regions" },
-  { wl: "304", label: "304 Å · Chromosphere (~80 K)", note: "Filaments / prominences" },
+  { wl: "304", label: "304 Å · Chromosphere (~80,000 K)", note: "Filaments / prominences" },
 ];
 
 export function Solar() {

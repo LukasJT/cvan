@@ -52,9 +52,11 @@ export function Overview({ sky, weather, aurora, bortle, score, curve, coords, w
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <VerdictCard title="Milky Way" verdict={milkyWayVerdict(sky, bortle ?? 4, cloud, curve)} icon="✦" />
+        <VerdictCard title="Milky Way" verdict={milkyWayVerdict(sky, bortle, cloud, curve)} icon="✦" />
         <VerdictCard title="Aurora" verdict={auroraVerdict(aurora, coords.lat, cloud, geomagLat)} icon="≋" />
-        <VerdictCard title="Deep Sky" verdict={deepSkyVerdict(sky, bortle ?? 4, cloud)} icon="◉" />
+        <VerdictCard title="Deep Sky" verdict={Number.isFinite(bortle)
+          ? deepSkyVerdict(sky, bortle, cloud)
+          : { rating: "LIGHT DATA UNKNOWN", color: "var(--text-muted)", text: "Atlas data is unavailable, so deep-sky visibility cannot be scored reliably." }} icon="◉" />
       </div>
     </div>
   );

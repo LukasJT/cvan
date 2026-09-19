@@ -77,9 +77,10 @@ function nearestZone(r, g, b) {
 }
 
 export function rgbToZone(r, g, b) {
-  // Pure white = no-data marker (out-of-bounds in some tiles); treat as zone 0.
+  // Pure white is the atlas' no-data marker. It is not evidence of a
+  // pristine sky, so callers must surface an unknown result.
   if (r === 255 && g === 255 && b === 255) {
-    return { n: 0, sub: "", label: "0", lpi: 0 };
+    return null;
   }
   const exact = RGB_INDEX.get(`${r},${g},${b}`);
   if (exact) return exact;
@@ -116,9 +117,8 @@ export function sqmToBortle(sqm) {
   return 9;
 }
 
-/* Loads the tile, draws it to an offscreen canvas, samples one pixel, and
-   returns the resolved zone. A 404 means djlorenz published no tile for
-   this region (no detected light pollution): we treat that as zone 0. */
+/* Loads the tile, draws it to an offscreen canvas, and samples one pixel.
+   A missing tile can also mean a network/CORS failure, so it is unknown. */
 function loadTilePixel(tileX, tileY, pxX, pxY) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -138,10 +138,7 @@ function loadTilePixel(tileX, tileY, pxX, pxY) {
         reject(e);
       }
     };
-    img.onerror = () => {
-      // 404 / network error → treat as no data (pristine).
-      resolve(null);
-    };
+    img.onerror = () => reject(new Error("light-pollution-atlas-unavailable"));
     img.src = `${LP_TILE_BASE}/tile_${NATIVE_Z}_${tileX}_${tileY}.png`;
   });
 }
@@ -151,20 +148,12 @@ export async function fetchLightPollutionAt(lat, lon) {
     throw new Error("invalid coordinates");
   }
   if (lat > 80 || lat < -80) {
-    // Outside djlorenz's coverage. Polar regions are dark; report pristine.
-    const lpi = 0;
-    return {
-      bortle: 1,
-      sqm: 22.0,
-      lpi,
-      zone: "0",
-      year: LP_TILE_YEAR,
-      outOfRange: true,
-    };
+    throw new RangeError("light-pollution-atlas-out-of-coverage");
   }
   const { tileX, tileY, pxX, pxY } = latLonToTilePixel(lat, lon);
   const px = await loadTilePixel(tileX, tileY, pxX, pxY);
-  const zone = px ? rgbToZone(px.r, px.g, px.b) : { n: 0, sub: "", label: "0", lpi: 0 };
+  const zone = rgbToZone(px.r, px.g, px.b);
+  if (!zone) throw new Error("light-pollution-atlas-no-data");
   const sqm = lpiToSqm(zone.lpi);
   const bortle = sqmToBortle(sqm);
   return {
@@ -173,6 +162,5 @@ export async function fetchLightPollutionAt(lat, lon) {
     lpi: zone.lpi,
     zone: zone.label,
     year: LP_TILE_YEAR,
-    tileMissing: !px,
   };
 }
