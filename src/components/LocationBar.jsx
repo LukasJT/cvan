@@ -52,7 +52,7 @@ export function LocationBar({
       <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--panel-border)" }}>
         <div className="flex items-center gap-3 mb-2 flex-wrap">
           <div className="mono text-xs uppercase tracking-widest muted">
-            Light Pollution · Bortle Class
+            Light Pollution · Estimated Bortle Class
           </div>
           {viirsState === "loading" && (
             <span className="pill mono" style={{ background: "var(--text-muted)", color: "var(--bg-base)" }}>FETCHING ATLAS…</span>
@@ -88,9 +88,13 @@ function BortleDisplay({ bortleAuto }) {
       </div>
       <div className="mono text-xs mt-1 secondary">
         SQM <span className="gold">{bortleAuto.sqm.toFixed(2)}</span> mag/arcsec²
-        · LPI <span className="gold">{bortleAuto.lpi.toFixed(2)}</span>×
+        · artificial / natural <span className="gold">{bortleAuto.lpi.toFixed(2)}</span>×
         · zone <span className="gold">{bortleAuto.zone}</span>
         {bortleAuto.year ? <> · atlas <span className="gold">{bortleAuto.year}</span></> : null}
+      </div>
+      <div className="body text-xs mt-2 muted">
+        Approximation from modeled zenith brightness in the Lorenz VIIRS atlas; a visual Bortle assessment also depends on the full sky and local conditions.
+        {" "}<a href="/guides/light-pollution-maps/">How this estimate works →</a>
       </div>
       <div className="body text-sm mt-2 primary">{info.mw}</div>
     </div>

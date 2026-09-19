@@ -1,0 +1,21 @@
+[
+  { "id": "composite-visibility", "component": "Overview", "label": "Composite Visibility", "guide": "/guides/stargazing-conditions/#short-answer", "tab": "overview", "status": "covered" },
+  { "id": "tonight-altitude-chart", "component": "Overview", "label": "Tonight's Sky · Altitude over Time", "guide": "/guides/stargazing-conditions/#five-factors", "tab": "overview", "status": "covered" },
+  { "id": "weather", "component": "Overview", "label": "Cloud Cover", "guide": "/guides/stargazing-conditions/#five-factors", "tab": "overview", "status": "covered" },
+  { "id": "light-pollution-atlas", "component": "LocationBar", "label": "Estimated Bortle Class", "guide": "/guides/light-pollution-maps/#what-map-shows", "tab": "overview", "status": "covered" },
+  { "id": "sqm-estimate", "component": "LocationBar", "label": "SQM", "guide": "/guides/light-pollution-maps/#cvan-pipeline", "tab": "overview", "status": "covered" },
+  { "id": "milky-way-core-altitude", "component": "MilkyWay", "label": "Galactic core altitude", "guide": "/guides/milky-way-latitude/#calculation", "tab": "milkyway", "status": "covered" },
+  { "id": "milky-way-arch", "component": "MilkyWayArch", "label": "Milky Way Arch", "guide": "/guides/milky-way-latitude/#hemispheres", "tab": "milkyway", "status": "partial" },
+  { "id": "estimated-kp", "component": "Aurora", "label": "Kp now", "guide": "/guides/kp-index/#what-kp-is", "tab": "aurora", "status": "covered" },
+  { "id": "kp-forecast", "component": "KpForecast", "label": "3-Day Kp Forecast", "guide": "/guides/kp-index/#what-kp-is", "tab": "kpforecast", "status": "covered" },
+  { "id": "auroral-oval", "component": "Aurora", "label": "Auroral Oval Map", "guide": "/guides/kp-index/#not-probability", "tab": "aurora", "status": "covered" },
+  { "id": "geomagnetic-latitude", "component": "Aurora", "label": "Geomagnetic latitude", "guide": "/guides/kp-index/#latitude", "tab": "aurora", "status": "partial" },
+  { "id": "twilight-timeline", "component": "MoonSun", "label": "Twilight Phases", "guide": "/guides/twilight/#three-stages", "tab": "moonsun", "status": "covered" },
+  { "id": "moon-phase", "component": "MoonSun", "label": "Moon phase", "guide": "/guides/moonlight-stargazing/#phase-is-not-enough", "tab": "moonsun", "status": "covered" },
+  { "id": "moon-brightness", "component": "MoonSun", "label": "Moon Light Pollution Analysis", "guide": "/guides/moonlight-stargazing/#cvan-model", "tab": "moonsun", "status": "covered" },
+  { "id": "planet-visibility", "component": "SolarSystem", "label": "Planet visibility", "guide": null, "tab": "solarsystem", "status": "backlog" },
+  { "id": "deep-sky-catalogs", "component": "DeepSky", "label": "Deep-sky catalogs", "guide": null, "tab": "deepsky", "status": "backlog" },
+  { "id": "solar-imagery", "component": "Solar", "label": "SUVI Multi-Wavelength", "guide": null, "tab": "solar", "status": "backlog" },
+  { "id": "constellation-visibility", "component": "Constellations", "label": "Constellation visibility", "guide": null, "tab": "constellations", "status": "backlog" },
+  { "id": "observing-planner", "component": "Planner", "label": "Planner", "guide": "/guides/stargazing-conditions/#use-cvan", "tab": "planner", "status": "partial" }
+]

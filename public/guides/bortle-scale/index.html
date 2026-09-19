@@ -72,7 +72,7 @@
         looks like in practice, how the underlying SQM measurement works,
         and how to use a light-pollution map to find a class you'll enjoy.
       </p>
-      <a class="cta" href="/">Find your Bortle Class on the live map →</a>
+      <a class="cta" href="/?tab=overview&amp;ref=guide-bortle-scale">Estimate sky brightness for your location →</a>
     </header>
 
     <main>
@@ -174,23 +174,23 @@
         bright planets.
       </p>
 
-      <h2>How CVAN measures your Bortle class</h2>
+      <h2>How CVAN estimates a Bortle class</h2>
       <p>
-        CVAN uses the <strong>NOAA NCEI VIIRS Day-Night Band</strong>
-        satellite radiance for your exact pixel — the same data behind
-        widely-used light-pollution maps. The raw radiance (in
-        nanowatts per cm² per steradian) is converted to <strong>artificial
-        sky brightness at zenith</strong> via the Falchi (2016) empirical
-        fit. That artificial component is added to the dark-sky natural
-        background (about 22.0 mag/arcsec²) and the result is reported as
-        SQM and binned into a Bortle Class.
+        CVAN samples a color zone from David Lorenz's VIIRS-derived light-
+        pollution atlas. The atlas models artificial zenith brightness from
+        annual nighttime-light input and atmospheric scattering; it is not
+        a live field measurement. CVAN converts the zone's modeled
+        artificial-to-natural brightness ratio to an SQM estimate and then
+        bins that number into an <em>approximate</em> Bortle class. The atlas
+        author notes that visual Bortle assessment considers the whole sky.
+        <a href="/guides/light-pollution-maps/">Read the calculation and its limits.</a>
       </p>
       <p>
         Three numbers appear in the app:
       </p>
       <ul>
         <li><strong>SQM</strong> in mag/arcsec² — the total sky brightness at zenith.</li>
-        <li><strong>LPI</strong>, the Light Pollution Index — how many times brighter your sky is than the natural background. LPI of 1.0 is a pristine site; LPI of 30+ is heavily light-polluted.</li>
+        <li><strong>Artificial / natural ratio</strong> — zero means no modeled artificial contribution; 1.0 means the modeled artificial and assumed natural components are equal.</li>
         <li><strong>Zone</strong> — VIIRS-derived darkness zone (1 pristine through 8 city) plus the Bortle class.</li>
       </ul>
 
@@ -225,7 +225,7 @@
         <dt>Bortle 9</dt><dd>SQM &lt;17.0 · Only planets &amp; brightest stars</dd>
       </div>
 
-      <a class="cta" href="/">See your location's Bortle class →</a>
+      <a class="cta" href="/?tab=overview&amp;ref=guide-bortle-scale">See your location's estimate →</a>
 
       <h2>Related guides</h2>
       <div class="tile-grid">
@@ -256,7 +256,7 @@
         <a href="/guides/bortle-scale/">Bortle</a>
         <a href="/guides/aurora/">Aurora</a>
       </div>
-      © Celestial Visibility Analysis Network · Open source on GitHub · No accounts, no tracking
+      © Celestial Visibility Analysis Network · Open source astronomy planning
     </footer>
   </body>
 </html>

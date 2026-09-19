@@ -25,6 +25,16 @@ import { Exotica } from "./components/Exotica.jsx";
 
 const WEATHER_HORIZON_DAYS = 16;
 const LOCATION_CACHE_KEY = "cvan-last-location";
+const VALID_TABS = new Set([
+  "overview", "milkyway", "aurora", "solar", "solarsystem", "deepsky",
+  "exotica", "constellations", "planner", "kpforecast", "moonsun", "faq", "sources",
+]);
+
+function tabFromUrl() {
+  if (typeof window === "undefined") return "overview";
+  const requested = new URLSearchParams(window.location.search).get("tab");
+  return VALID_TABS.has(requested) ? requested : "overview";
+}
 
 function persist(coords) {
   try {
@@ -35,7 +45,7 @@ function persist(coords) {
 }
 
 export default function CVAN() {
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState(tabFromUrl);
   const [coords, setCoords] = useState(null);
   const [now, setNow] = useState(new Date());
   const [bortleAuto, setBortleAuto] = useState(null);
@@ -63,13 +73,26 @@ export default function CVAN() {
   // Switch tab + scroll the content area into view so the user can see
   // that the click registered (especially helpful for "About & sources"
   // and the FULL CITATIONS link, which are far from the new content).
-  const goToTab = (next) => {
-    setTab(next);
+  const goToTab = (next, { updateHistory = true, scroll = true } = {}) => {
+    const safeTab = VALID_TABS.has(next) ? next : "overview";
+    if (updateHistory) {
+      const url = new URL(window.location.href);
+      if (safeTab === "overview") url.searchParams.delete("tab");
+      else url.searchParams.set("tab", safeTab);
+      window.history.pushState({ tab: safeTab }, "", `${url.pathname}${url.search}${url.hash}`);
+    }
+    setTab(safeTab);
     // Wait one frame so the new tab content mounts before scrolling.
-    requestAnimationFrame(() => {
+    if (scroll) requestAnimationFrame(() => {
       contentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   };
+
+  useEffect(() => {
+    const onPopState = () => goToTab(tabFromUrl(), { updateHistory: false, scroll: false });
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   // Apply theme on change
   useEffect(() => { applyTheme(theme); }, [theme]);
@@ -319,32 +342,7 @@ export default function CVAN() {
 
       <div className="star-bg" />
 
-      {/* 160x600 side ad slots — fixed-position, vertically centered.
-          Each ad runs in its own same-origin iframe so the Adsterra
-          `atOptions` global doesn't collide between the two slots and so
-          the referer the ad network sees is celestialvisibility.com. */}
-      <aside id="cvan-ad-left" className="cvan-side-ad cvan-side-ad-left" aria-hidden="true">
-        <iframe
-          src="/ad-160x600.html"
-          width="160"
-          height="600"
-          frameBorder="0"
-          scrolling="no"
-          title="Advertisement"
-          style={{ display: "block", border: 0 }}
-        />
-      </aside>
-      <aside id="cvan-ad-right" className="cvan-side-ad cvan-side-ad-right" aria-hidden="true">
-        <iframe
-          src="/ad-160x600.html"
-          width="160"
-          height="600"
-          frameBorder="0"
-          scrolling="no"
-          title="Advertisement"
-          style={{ display: "block", border: 0 }}
-        />
-      </aside>
+      <DesktopAds />
 
       <div className="relative max-w-6xl mx-auto px-6 py-8 cvan-main">
 
@@ -530,10 +528,36 @@ export default function CVAN() {
           <div className="mt-1">LIGHT POLLUTION · LORENZ VIIRS ATLAS · MOON SKY BRIGHTNESS · KRISCIUNAS-SCHAEFER (1991) · BORTLE SCALE · BORTLE (2001) · GEOMAG · IGRF-13 DIPOLE</div>
           <div className="mt-2">
             <button className="ghost" onClick={() => goToTab("sources")} style={{ padding: "0.25rem 0.6rem", fontSize: "0.65rem" }}>FULL CITATIONS →</button>
+            <a className="ghost" href="/guides/" style={{ display: "inline-block", padding: "0.25rem 0.6rem", fontSize: "0.65rem", marginLeft: 8, textDecoration: "none" }}>SCIENCE GUIDES →</a>
           </div>
         </footer>
       </div>
     </div>
+  );
+}
+
+function DesktopAds() {
+  const [wideEnough, setWideEnough] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(min-width: 1280px)").matches
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1280px)");
+    const onChange = (event) => setWideEnough(event.matches);
+    media.addEventListener?.("change", onChange);
+    return () => media.removeEventListener?.("change", onChange);
+  }, []);
+
+  if (!wideEnough) return null;
+  return (
+    <>
+      <aside id="cvan-ad-left" className="cvan-side-ad cvan-side-ad-left" aria-label="Advertisement">
+        <iframe src="/ad-160x600.html" width="160" height="600" frameBorder="0" scrolling="no" title="Advertisement" loading="lazy" style={{ display: "block", border: 0 }} />
+      </aside>
+      <aside id="cvan-ad-right" className="cvan-side-ad cvan-side-ad-right" aria-label="Advertisement">
+        <iframe src="/ad-160x600.html" width="160" height="600" frameBorder="0" scrolling="no" title="Advertisement" loading="lazy" style={{ display: "block", border: 0 }} />
+      </aside>
+    </>
   );
 }
 

@@ -80,7 +80,7 @@
       <ul>
         <li><strong>Site fix</strong> — IP geolocation, GPS, manual coords, or map pick.</li>
         <li><strong>Sky state</strong> — sun and moon altitude, twilight class, Galactic Centre position, planet positions, all using Meeus algorithms and JPL Keplerian elements.</li>
-        <li><strong>Light pollution</strong> — NOAA NCEI VIIRS Day-Night Band radiance for the chosen pixel, converted via Falchi-style empirical fit to artificial sky brightness, SQM, then a Bortle class (1–9).</li>
+        <li><strong>Light pollution</strong> — a sampled zone from the Lorenz VIIRS-derived atlas, converted from modeled artificial-to-natural brightness into an SQM and approximate Bortle-class estimate.</li>
         <li><strong>Moon contribution</strong> — Krisciunas-Schaefer (1991) model: how much the moon brightens the local sky at your zenith, given its current altitude and phase.</li>
         <li><strong>Weather</strong> — Open-Meteo cloud cover and visibility for the next 16 days, interpolated to the slider's previewed instant.</li>
         <li><strong>Aurora</strong> — NOAA SWPC planetary Kp index and the geomagnetic auroral oval, scored against your geomagnetic latitude using the IGRF-13 dipole.</li>
@@ -158,7 +158,7 @@
       <h2>Data sources</h2>
       <dl class="source-grid">
         <dt>NOAA SWPC</dt><dd>Planetary Kp index, auroral oval position, K-index forecast (5-min refresh)</dd>
-        <dt>NOAA NCEI VIIRS</dt><dd>Day-Night Band radiance for light-pollution calculations</dd>
+        <dt>Lorenz / VIIRS atlas</dt><dd>Modeled artificial zenith brightness derived from annual nighttime-light input</dd>
         <dt>Open-Meteo</dt><dd>Cloud cover, visibility, temperature, dew point (16-day forecast)</dd>
         <dt>NASA NeoWs</dt><dd>Near-Earth object close approaches and PHA flags</dd>
         <dt>NASA Mars Photo API</dt><dd>Rover status, sol counts, and latest photos</dd>
@@ -204,7 +204,7 @@
         <a href="/guides/bortle-scale/">Bortle</a>
         <a href="/guides/aurora/">Aurora</a>
       </div>
-      © Celestial Visibility Analysis Network · Open source on GitHub · No accounts, no tracking
+      © Celestial Visibility Analysis Network · Open source astronomy planning
     </footer>
   </body>
 </html>

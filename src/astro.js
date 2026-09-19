@@ -624,7 +624,7 @@ export function compositeScore({ sky, cloud, bortle }) {
   else if (sky.tw.code === "civil") s -= 50;
   else if (sky.tw.code === "nautical") s -= 25;
   else if (sky.tw.code === "astro") s -= 10;
-  s -= (bortle - 1) * 7;
+  if (Number.isFinite(bortle)) s -= (bortle - 1) * 7;
   s -= sky.moonBrightness * 8;
   if (cloud != null) s -= cloud * 0.4;
   return clamp(Math.round(s), 0, 100);

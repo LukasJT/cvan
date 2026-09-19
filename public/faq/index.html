@@ -58,7 +58,7 @@
           "name": "Can I see the aurora from my location?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Whether you can see the aurora depends on your geomagnetic latitude and the current Kp index. At Kp 3 you need to be above ~63° geomagnetic latitude; at Kp 5 (geomagnetic storm) the viewing line drops to ~56°; and at Kp 7 or higher aurora can be visible from mid-latitude US states and central Europe. CVAN's aurora tab compares your geomagnetic latitude (computed via the IGRF-13 dipole) to the live NOAA SWPC Kp index and tells you whether tonight is viable."
+            "text": "Aurora visibility depends on the auroral oval, geomagnetic latitude, activity, darkness, clouds, local light and the poleward horizon. Kp-to-latitude relationships are approximate, so CVAN combines NOAA SWPC activity with local context as planning guidance rather than a guarantee."
           }
         },
         {
@@ -130,7 +130,7 @@
           "name": "What is the Galactic Centre and when is it visible?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "The Galactic Centre is the dense core region of the Milky Way, in the constellation Sagittarius near the Scorpius border. It's the brightest part of the band and the most photographed Milky Way region. From the Northern Hemisphere it transits highest in the south in late July; from the Southern Hemisphere it passes overhead and is visible most of the year. CVAN's Milky Way tab tracks the core's altitude and predicts the next viewable window."
+            "text": "The Galactic Centre is the dense core region of the Milky Way toward Sagittarius. Its maximum transit altitude is set by observer latitude; the calendar changes when that position overlaps darkness. CVAN tracks its local altitude and dark window."
           }
         },
         {
@@ -146,7 +146,7 @@
           "name": "What is light pollution and how is it measured?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Light pollution is artificial-light brightening of the night sky, primarily from street lighting, commercial signage, and atmospheric scattering. It's measured in mag/arcsec² (SQM) — higher numbers mean a darker sky. A pristine site reads about 21.9 SQM; central cities can be below 18.0 SQM. CVAN uses the NOAA VIIRS Day-Night Band radiance for your exact pixel, converts it via the Falchi 2016 empirical fit, and reports both the SQM and the Bortle Class (1-9)."
+            "text": "Light pollution is artificial-light brightening of the night sky. CVAN samples a zone from a VIIRS-derived modeled atlas, converts its artificial-to-natural brightness ratio into an SQM estimate, and reports an approximate Bortle class. It is not a live field measurement."
           }
         },
         {
@@ -205,7 +205,7 @@
         <summary>Can I see the aurora from my location?</summary>
         <div class="answer">
           <p>It depends on your geomagnetic latitude and the current Kp index. At Kp 3 you need to be above ~63° geomagnetic latitude; at Kp 5 (geomagnetic storm) the viewing line drops to ~56°; and at Kp 7 or higher aurora can be visible from mid-latitude US states and central Europe.</p>
-          <p>CVAN's <a href="/">aurora tab</a> compares your geomagnetic latitude (computed via the IGRF-13 dipole) to the live NOAA SWPC Kp index, factors in local sun altitude and cloud cover, and tells you whether tonight is viable. See the full <a href="/guides/aurora/">aurora viewing guide</a> for typical Kp thresholds by city.</p>
+          <p>CVAN's <a href="/?tab=aurora">aurora tab</a> compares your geomagnetic latitude with NOAA SWPC activity, darkness and cloud context. The result is planning guidance because Kp-to-latitude relationships are approximate. See the <a href="/guides/kp-index/">Kp explainer</a> and <a href="/guides/aurora/">aurora viewing guide</a>.</p>
         </div>
       </details>
 
@@ -247,7 +247,7 @@
         <summary>What is light pollution and how is it measured?</summary>
         <div class="answer">
           <p>Light pollution is artificial-light brightening of the night sky, primarily from street lighting, commercial signage, and atmospheric scattering. It's measured in <strong>mag/arcsec² (SQM)</strong> — higher numbers mean a darker sky. A pristine site reads about 21.9 SQM; central cities can be below 18.0 SQM.</p>
-          <p>CVAN uses the NOAA VIIRS Day-Night Band radiance for your exact pixel, converts it via the Falchi (2016) empirical fit, and reports both the SQM and the Bortle Class (1-9).</p>
+          <p>CVAN samples a zone from a VIIRS-derived modeled light-pollution atlas, converts its artificial-to-natural brightness ratio into an SQM estimate, and reports an approximate Bortle class. It is not a live field measurement. <a href="/guides/light-pollution-maps/">See how the estimate works.</a></p>
         </div>
       </details>
 
@@ -272,7 +272,7 @@
         <summary>What is the Galactic Centre and when is it visible?</summary>
         <div class="answer">
           <p>The Galactic Centre is the dense core region of the Milky Way, in the constellation <strong>Sagittarius</strong> near the Scorpius border. It's the brightest part of the band and the most photographed Milky Way region.</p>
-          <p>From the Northern Hemisphere it transits highest in the south in late July; from the Southern Hemisphere it passes overhead and is visible most of the year. CVAN's Milky Way tab tracks its altitude and predicts the next viewable window.</p>
+          <p>Its maximum transit altitude is set by latitude; the calendar changes when that transit overlaps darkness. It is low in the south from many northern sites and can pass near the zenith at some southern latitudes. CVAN's <a href="/?tab=milkyway">Milky Way tab</a> tracks the local altitude and dark window.</p>
         </div>
       </details>
 
@@ -345,7 +345,7 @@
         <a href="/guides/bortle-scale/">Bortle</a>
         <a href="/guides/aurora/">Aurora</a>
       </div>
-      © Celestial Visibility Analysis Network · Open source on GitHub · No accounts, no tracking
+      © Celestial Visibility Analysis Network · Open source astronomy planning
     </footer>
   </body>
 </html>
