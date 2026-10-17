@@ -526,6 +526,13 @@ export default function CVAN() {
         )}
 
         <footer className="mt-16 pt-6 text-center mono text-xs" style={{ color: "var(--text-subtle)", borderTop: "1px solid var(--panel-border)" }}>
+          <nav aria-label="Astronomy guides" className="mb-5 flex flex-wrap justify-center gap-x-5 gap-y-2">
+            <a href="/guides/milky-way/">Milky Way guide</a>
+            <a href="/guides/aurora/">Aurora guide</a>
+            <a href="/guides/bortle-scale/">Bortle scale</a>
+            <a href="/faq/">FAQ</a>
+            <a href="/about/">About</a>
+          </nav>
           <div>POSITIONS · MEEUS ASTRONOMICAL ALGORITHMS · WEATHER · OPEN-METEO · AURORA · NOAA SWPC</div>
           <div className="mt-1">LIGHT POLLUTION · LORENZ VIIRS ATLAS · MOON SKY BRIGHTNESS · KRISCIUNAS-SCHAEFER (1991) · BORTLE SCALE · BORTLE (2001) · GEOMAG · IGRF-13 DIPOLE</div>
           <div className="mt-2">

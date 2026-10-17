@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
     <!-- Primary SEO -->
-    <title>CVAN · Stargazing forecast, Milky Way + aurora visibility — Celestial Visibility Analysis Network</title>
-    <meta name="description" content="Real-time stargazing forecast for any location: Milky Way visibility, aurora Kp forecast, Bortle light-pollution class, planet positions, deep-sky catalogs, Hubble + JWST imagery, NEOs, comets, dwarf planets, and live transient events. Free, open data from NOAA, NASA, JPL, and Open-Meteo." />
+    <title>Stargazing Forecast, Milky Way &amp; Aurora Visibility | CVAN</title>
+    <meta name="description" content="Plan tonight's stargazing with local cloud cover, Milky Way visibility, aurora activity, moonlight, and Bortle light pollution. Explore the sky with CVAN's free astronomy tools." />
     <meta name="keywords" content="stargazing, astronomy, milky way visibility, aurora forecast, Kp index, Bortle scale, light pollution, planets tonight, Messier catalog, NGC, deep sky, dark sky, ISS pass, NEO tracker, comet ephemeris, Jupiter, Saturn, Mars, JWST, Hubble, celestial visibility, planetarium" />
     <meta name="author" content="LukasJT" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
@@ -123,24 +123,26 @@
     </script>
   </head>
   <body>
-    <!-- Crawler-visible fallback: described content for search engines and
-         users without JavaScript. The React app replaces this on hydrate. -->
-    <noscript>
-      <main style="font-family: system-ui, sans-serif; max-width: 720px; margin: 4rem auto; padding: 0 1.5rem; color: #e8e8e8; background: #050914;">
-        <h1>CVAN — Celestial Visibility Analysis Network</h1>
-        <p>A real-time stargazing planner computing Milky Way visibility, aurora Kp forecasts, Bortle light pollution class, planet and moon positions, deep-sky catalogs, Hubble + JWST imagery, comets, near-Earth objects, dwarf planets, pulsars, black holes, and live transient events.</p>
-        <h2>Data sources</h2>
-        <ul>
-          <li>NOAA Space Weather Prediction Center (Kp, aurora oval)</li>
-          <li>NOAA VIIRS Day-Night Band (light pollution)</li>
-          <li>Open-Meteo (cloud cover, visibility)</li>
-          <li>NASA NeoWs, Mars Photo API, and JPL ephemerides</li>
-          <li>ESA Hubble and STScI image archives</li>
-        </ul>
-        <p>Please enable JavaScript to use the interactive app.</p>
+    <!-- Meaningful content and links are available in the initial response.
+         React replaces this shell when the interactive forecast starts. -->
+    <div id="root">
+      <main style="font-family: system-ui, sans-serif; max-width: 760px; margin: 4rem auto; padding: 0 1.5rem; color: #e8e8e8; line-height: 1.6;">
+        <h1>Stargazing forecast and celestial visibility</h1>
+        <p>CVAN helps you plan a night under the stars. Check local cloud cover, Milky Way visibility, aurora activity, moonlight, and Bortle light pollution, then explore planets and deep-sky objects in the interactive sky planner.</p>
+        <p>Forecast data comes from NOAA and Open-Meteo, with astronomy data from NASA and JPL.</p>
+        <h2>Explore our astronomy guides</h2>
+        <nav aria-label="Astronomy guides">
+          <ul>
+            <li><a href="/guides/milky-way/" style="color: #9bd8ff;">When and where to see the Milky Way</a></li>
+            <li><a href="/guides/aurora/" style="color: #9bd8ff;">How to read an aurora forecast</a></li>
+            <li><a href="/guides/bortle-scale/" style="color: #9bd8ff;">Understanding the Bortle light pollution scale</a></li>
+            <li><a href="/faq/" style="color: #9bd8ff;">Stargazing forecast questions</a></li>
+            <li><a href="/about/" style="color: #9bd8ff;">About CVAN</a></li>
+          </ul>
+        </nav>
+        <p>Enable JavaScript to use the live forecast and sky planner.</p>
       </main>
-    </noscript>
-    <div id="root"></div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
       // Register the service worker on production hosts only — keeps Vite
