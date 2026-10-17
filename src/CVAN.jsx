@@ -36,6 +36,7 @@ function persist(coords) {
 
 export default function CVAN() {
   const [tab, setTab] = useState("overview");
+  const [showSideAd, setShowSideAd] = useState(false);
   const [coords, setCoords] = useState(null);
   const [now, setNow] = useState(new Date());
   const [bortleAuto, setBortleAuto] = useState(null);
@@ -73,6 +74,14 @@ export default function CVAN() {
 
   // Apply theme on change
   useEffect(() => { applyTheme(theme); }, [theme]);
+
+  useEffect(() => {
+    const wide = window.matchMedia("(min-width: 1280px)");
+    const update = () => setShowSideAd(wide.matches);
+    update();
+    wide.addEventListener("change", update);
+    return () => wide.removeEventListener("change", update);
+  }, []);
 
   // Persist any coord change to localStorage so the next visit warm-starts.
   useEffect(() => { if (coords) persist(coords); }, [coords]);
@@ -319,32 +328,19 @@ export default function CVAN() {
 
       <div className="star-bg" />
 
-      {/* 160x600 side ad slots — fixed-position, vertically centered.
-          Each ad runs in its own same-origin iframe so the Adsterra
-          `atOptions` global doesn't collide between the two slots and so
-          the referer the ad network sees is celestialvisibility.com. */}
-      <aside id="cvan-ad-left" className="cvan-side-ad cvan-side-ad-left" aria-hidden="true">
-        <iframe
-          src="/ad-160x600.html"
-          width="160"
-          height="600"
-          frameBorder="0"
-          scrolling="no"
-          title="Advertisement"
-          style={{ display: "block", border: 0 }}
-        />
-      </aside>
-      <aside id="cvan-ad-right" className="cvan-side-ad cvan-side-ad-right" aria-hidden="true">
-        <iframe
-          src="/ad-160x600.html"
-          width="160"
-          height="600"
-          frameBorder="0"
-          scrolling="no"
-          title="Advertisement"
-          style={{ display: "block", border: 0 }}
-        />
-      </aside>
+      {/* Load the approved unit once, only when a wide viewport has a reserved gutter. */}
+      {showSideAd && (
+        <aside id="cvan-ad-right" className="cvan-side-ad cvan-side-ad-right" aria-label="Advertisement">
+          <iframe
+            src="/ad-160x600.html"
+            width="160"
+            height="600"
+            loading="lazy"
+            title="Advertisement"
+            style={{ display: "block", border: 0 }}
+          />
+        </aside>
+      )}
 
       <div className="relative max-w-6xl mx-auto px-6 py-8 cvan-main">
 
@@ -742,8 +738,8 @@ function CvanGlobalStyles() {
       .leaflet-control-zoom a:hover { background: var(--strip-bg) !important; }
       .cvan-marker { background: transparent; border: none; }
 
-      /* ----- Reserved 160x600 side ad slots -----
-         Below 1280px the slots are hidden and content uses the normal layout.
+      /* ----- Reserved 160x600 side ad gutter -----
+         Below 1280px the ad is not mounted and content uses the normal layout.
          Between 1280 and 1503px the content shrinks so 176px gutters
          (160 banner + 8 outer margin + 8 content gap) are always available.
          At 1504px+ the natural mx-auto centering already leaves >=176px on
